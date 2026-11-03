@@ -1,6 +1,9 @@
 package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,21 +21,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.MedicalServices
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.QrCode2
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Payment
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -44,6 +41,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -64,9 +62,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.data.integration.PaymentAndWhatsAppService
 import com.example.data.model.Appointment
 import com.example.data.model.MarketplaceProvider
 import com.example.data.model.MarketplaceServiceItem
@@ -91,10 +91,11 @@ fun ProviderDetailAndBookingScreen(
     viewModel: GroomlyViewModel
 ) {
     BackHandler { onBack() }
+    val context = LocalContext.current
 
     val selectedServices = remember(provider.id) {
         mutableStateListOf<MarketplaceServiceItem>().apply {
-            provider.services.firstOrNull()?.let { add(it) }
+            provider.services.take(2).forEach { add(it) }
         }
     }
     var selectedStaffId by remember(provider.id) {
@@ -116,13 +117,15 @@ fun ProviderDetailAndBookingScreen(
             when (provider.vertical) {
                 "BRIDAL" -> "BRIDALGLOW"
                 "DERMATOLOGY", "DIETITIAN" -> "CLINIC15"
-                else -> "GROOM100"
+                else -> "BYOP18"
             }
         )
     }
+    var prechargePercent by remember { mutableIntStateOf(20) } // 20%, 50%, 100%, or 0%
     var selectedPaymentType by remember { mutableStateOf("ADVANCE") } // ADVANCE, FULL, PAY_AT_VENUE
     var selectedPaymentMethod by remember { mutableStateOf("UPI") } // UPI, CARD, NET_BANKING, WALLET, CASH_AT_SHOP
     var bookAsHomeService by remember { mutableStateOf(false) }
+    var showGatewayModal by remember { mutableStateOf(false) }
 
     val selectedStaffObj = provider.staff.firstOrNull { it.id == selectedStaffId }
     val staffAddon = selectedStaffObj?.priceAddonInr ?: 0
@@ -136,8 +139,45 @@ fun ProviderDetailAndBookingScreen(
         selectedServices = selectedServices.toList(),
         staffAddonInr = staffAddon,
         couponCode = couponInput,
-        paymentType = selectedPaymentType
+        paymentType = selectedPaymentType,
+        prechargeCustomPercent = prechargePercent
     )
+
+    if (showGatewayModal) {
+        MultiGatewayPaymentDialog(
+            amountInr = breakdown.advancePayableInr,
+            initialGateway = selectedPaymentMethod,
+            serviceDescription = selectedServices.joinToString(" + ") { it.name.substringBefore(" (") },
+            onDismiss = { showGatewayModal = false },
+            onLaunchUpiApp = {
+                PaymentAndWhatsAppService.launchUpiPaymentIntent(
+                    context = context,
+                    amountInr = breakdown.advancePayableInr,
+                    merchantName = provider.name,
+                    transactionNote = "Groomly Self-Created Package"
+                )
+            },
+            onPaymentAuthorized = { chosenMethod ->
+                selectedPaymentMethod = chosenMethod
+                showGatewayModal = false
+                viewModel.confirmSmartAppointment(
+                    provider = provider,
+                    selectedServices = selectedServices.toList(),
+                    staffId = selectedStaffId,
+                    staffName = staffDisplayName,
+                    staffAddonInr = staffAddon,
+                    dateIso = selectedDate,
+                    timeSlot = selectedTimeSlot,
+                    couponCode = couponInput,
+                    paymentMethod = chosenMethod,
+                    paymentType = selectedPaymentType,
+                    prechargeCustomPercent = prechargePercent,
+                    isHomeService = bookAsHomeService,
+                    onComplete = onBack
+                )
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -159,7 +199,7 @@ fun ProviderDetailAndBookingScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to Marketplace")
             }
             Text(
-                text = provider.vertical + " PROFILE & SMART BOOKING",
+                text = provider.vertical + " • CUSTOM PACKAGE STUDIO",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -172,7 +212,9 @@ fun ProviderDetailAndBookingScreen(
         Card(
             shape = RoundedCornerShape(22.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(spring(stiffness = Spring.StiffnessMediumLow))
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Row(
@@ -184,7 +226,7 @@ fun ProviderDetailAndBookingScreen(
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
-                            text = provider.genderFocus,
+                            text = "${provider.genderFocus} • 📍 ${provider.distanceKm} km",
                             color = GroomlyObsidian,
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
@@ -201,7 +243,7 @@ fun ProviderDetailAndBookingScreen(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Verified Partner",
+                                text = "MNC Verified Partner",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = GroomlySuccessMint
                             )
@@ -248,74 +290,110 @@ fun ProviderDetailAndBookingScreen(
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
+                Text(text = provider.description, style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = provider.description,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = "📍 ${provider.address} (${provider.distanceKm} km) • 🕒 ${provider.openingHours}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "★ ${provider.rating} (${provider.reviewCount} verified reviews) • 📞 ${provider.contactPhone}",
+                    text = "📍 ${provider.address} • 🕒 ${provider.openingHours} • ★ ${provider.rating} (${provider.reviewCount})",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Live Queue Quick Join Banner inside Provider Profile
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth()
+                // Live Queue + Direct WhatsApp Bar
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
+                    Button(
+                        onClick = {
+                            viewModel.joinProviderLiveQueue(
+                                provider = provider,
+                                serviceName = selectedServices.firstOrNull()?.name ?: provider.services.first().name,
+                                staffName = staffDisplayName
+                            )
+                        },
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .weight(1f)
+                            .testTag("join_live_queue_button")
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "LIVE WALK-IN QUEUE • Serving #${provider.liveQueueCurrentServing}",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = GroomlySuccessMint,
-                                fontWeight = FontWeight.Bold
+                        Text("Join Queue (#${provider.liveQueueNextToken})")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            val pkgSummary = selectedServices.joinToString(", ") { it.name.substringBefore(" (") }
+                            viewModel.dispatchWhatsAppAndOpenChat(
+                                context = context,
+                                phone = provider.contactPhone,
+                                message = "Hi ${provider.name}! I'm creating my custom Groomly package ($pkgSummary) on $selectedDate at $selectedTimeSlot."
                             )
-                            Text(
-                                text = "Next Token #${provider.liveQueueNextToken} • Est. ~${provider.estimatedWaitPerPersonMin * 2}m wait (non-guaranteed)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Button(
-                            onClick = {
-                                viewModel.joinProviderLiveQueue(
-                                    provider = provider,
-                                    serviceName = selectedServices.firstOrNull()?.name ?: provider.services.first().name,
-                                    staffName = staffDisplayName
-                                )
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.testTag("join_live_queue_button")
-                        ) {
-                            Text("Join Queue")
-                        }
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("provider_whatsapp_button")
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "WhatsApp", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("WhatsApp Desk")
                     }
                 }
             }
         }
 
-        // STEP 1: Select Services & Bundles
-        Text(
-            text = "1. Select Services or Packages (Multi-Select Enabled)",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
+        // STEP 1: SELF-CREATED CUSTOM PACKAGING BUILDER (BYOP)
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = "Self-Created Package",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "1. Self-Created Custom Package Builder",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(
+                    text = "Coming for a Haircut? Add any other shop services below according to your wishes. Multi-service packages unlock automatic bundle discounts & custom pre-charging!",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                val tierProgress = (selectedServices.size / 4f).coerceIn(0.25f, 1f)
+                LinearProgressIndicator(
+                    progress = { tierProgress },
+                    color = GroomlyElectricLime,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                )
+                Text(
+                    text = if (breakdown.selfPackageDiscountPercent > 0) {
+                        "🎉 Self-Created Package Tier Active: ${selectedServices.size} Services = ${breakdown.selfPackageDiscountPercent}% Automatic Bundle Discount (-₹${breakdown.selfPackageDiscountInr})"
+                    } else {
+                        "Add 1 more service to your Haircut to unlock 10% Self-Created Package Discount!"
+                    },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = GroomlySuccessMint,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
         provider.services.forEach { service ->
             val isChecked = selectedServices.any { it.id == service.id }
             Card(
@@ -329,6 +407,7 @@ fun ProviderDetailAndBookingScreen(
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .animateContentSize()
                     .clickable {
                         if (isChecked && selectedServices.size > 1) {
                             selectedServices.removeAll { it.id == service.id }
@@ -369,7 +448,7 @@ fun ProviderDetailAndBookingScreen(
                                     shape = RoundedCornerShape(6.dp)
                                 ) {
                                     Text(
-                                        text = "BUNDLE",
+                                        text = "CURATED BUNDLE",
                                         style = MaterialTheme.typography.labelMedium,
                                         color = Color.White,
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -382,17 +461,10 @@ fun ProviderDetailAndBookingScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        if (service.bundleIncludedItems.isNotEmpty()) {
-                            Text(
-                                text = "Includes: " + service.bundleIncludedItems.joinToString(" • "),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
                         Text(
                             text = "${service.durationMinutes} mins (+${service.bufferMinutes}m prep buffer)",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                     Column(horizontalAlignment = Alignment.End) {
@@ -439,34 +511,6 @@ fun ProviderDetailAndBookingScreen(
             }
         }
 
-        selectedStaffObj?.let { staff ->
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "${staff.name} (${staff.roleTitle}) • ★ ${staff.rating} (${staff.completedJobs} bookings)",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Specialty: ${staff.specialty} • Shift: ${staff.shiftHours} (Break: ${staff.breakWindow})",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (staff.portfolioHighlights.isNotEmpty()) {
-                        Text(
-                            text = "Portfolio: " + staff.portfolioHighlights.joinToString(" | "),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            }
-        }
-
         // STEP 3: Select Date & Conflict-Checked Slot
         Text(
             text = "3. Select Date & Conflict-Validated Slot",
@@ -495,14 +539,11 @@ fun ProviderDetailAndBookingScreen(
                     selected = selectedTimeSlot == slot,
                     enabled = isAvailable,
                     onClick = { if (isAvailable) selectedTimeSlot = slot },
-                    label = {
-                        Text(if (isAvailable) slot else "$slot (Booked)")
-                    }
+                    label = { Text(if (isAvailable) slot else "$slot (Booked)") }
                 )
             }
         }
 
-        // Home Service Option if supported
         if (provider.homeServiceAvailable) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -515,7 +556,7 @@ fun ProviderDetailAndBookingScreen(
                     Column {
                         Text("Book as Doorstep Home Service", style = MaterialTheme.typography.titleSmall)
                         Text(
-                            "Professional arrives at your saved address with sanitized kit",
+                            "Professional arrives at your GPS address with sanitized kit",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -525,16 +566,16 @@ fun ProviderDetailAndBookingScreen(
             }
         }
 
-        // STEP 4: Coupon & Payment Split
+        // STEP 4: Custom Pre-Charge & Payment Gateway Options
         Text(
-            text = "4. Coupon & India-First Payment Method",
+            text = "4. Pre-Charge According to Your Wishes & Payment Gateway",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
         OutlinedTextField(
             value = couponInput,
             onValueChange = { couponInput = it.uppercase() },
-            label = { Text("Promo Code (Try GROOM100, LIME20, BRIDALGLOW, CLINIC15)") },
+            label = { Text("Promo Code (BYOP18, GROOM100, LIME20, BRIDALGLOW)") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
@@ -544,13 +585,17 @@ fun ProviderDetailAndBookingScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             listOf(
-                "ADVANCE" to "20% Advance Lock",
-                "FULL" to "100% Full Online",
-                "PAY_AT_VENUE" to "Cash / Pay at Shop"
-            ).forEach { (key, label) ->
+                Triple("ADVANCE", 20, "20% Pre-Charge Lock"),
+                Triple("HALF", 50, "50% Half Pre-Charge"),
+                Triple("FULL", 100, "100% Full Pre-Pay"),
+                Triple("PAY_AT_VENUE", 0, "Cash at Salon")
+            ).forEach { (typeKey, pct, label) ->
                 FilterChip(
-                    selected = selectedPaymentType == key,
-                    onClick = { selectedPaymentType = key },
+                    selected = selectedPaymentType == typeKey && prechargePercent == pct,
+                    onClick = {
+                        selectedPaymentType = typeKey
+                        prechargePercent = pct
+                    },
                     label = { Text(label) }
                 )
             }
@@ -560,16 +605,22 @@ fun ProviderDetailAndBookingScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            listOf("UPI", "CARD", "NET_BANKING", "WALLET", "CASH_AT_SHOP").forEach { method ->
+            listOf(
+                "UPI" to "⚡ UPI App (GPay/PhonePe)",
+                "CARD" to "🛡️ Razorpay / Stripe Card",
+                "NET_BANKING" to "🏦 NetBanking",
+                "WALLET" to "👛 Groomly Wallet",
+                "CASH_AT_SHOP" to "💵 Cash at Shop"
+            ).forEach { (method, label) ->
                 FilterChip(
                     selected = selectedPaymentMethod == method,
                     onClick = { selectedPaymentMethod = method },
-                    label = { Text(method.replace("_", " ")) }
+                    label = { Text(label) }
                 )
             }
         }
 
-        // Payment Breakdown Card (Exact Prompt Logic: Service ₹500 -> Advance ₹100 -> Remaining ₹400)
+        // Transparent Self-Created Package & Pre-Charge Breakdown Card
         Card(
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -580,44 +631,56 @@ fun ProviderDetailAndBookingScreen(
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
-                    text = "SMART BOOKING & PAYMENT BREAKDOWN",
+                    text = "SELF-CREATED PACKAGE & PRE-CHARGE RECEIPT",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
                 )
+                BreakdownRow("Selected Services (${selectedServices.size} items)", "₹${breakdown.subtotalInr}")
                 BreakdownRow("Total Duration (incl. buffer)", "${breakdown.totalDurationMinutes} mins")
-                BreakdownRow("Service & Specialist Subtotal", "₹${breakdown.subtotalInr}")
-                if (breakdown.discountInr > 0) {
-                    BreakdownRow("Coupon Discount (${breakdown.appliedCoupon})", "- ₹${breakdown.discountInr}")
+                if (breakdown.selfPackageDiscountInr > 0) {
+                    BreakdownRow(
+                        "Self-Created Package Bonus (${breakdown.selfPackageDiscountPercent}%)",
+                        "- ₹${breakdown.selfPackageDiscountInr}",
+                        highlight = true
+                    )
+                }
+                if (breakdown.couponDiscountInr > 0) {
+                    BreakdownRow("Coupon Discount (${breakdown.appliedCoupon})", "- ₹${breakdown.couponDiscountInr}")
                 }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                BreakdownRow("Net Service Amount", "₹${breakdown.netTotalInr}", bold = true)
-                BreakdownRow("Advance Payable Now ($selectedPaymentMethod)", "₹${breakdown.advancePayableInr}", highlight = true)
-                BreakdownRow("Remaining Balance at Venue", "₹${breakdown.remainingBalanceInr}", bold = true)
-                Text(
-                    text = provider.cancellationPolicy,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                BreakdownRow("Net Custom Package Total", "₹${breakdown.netTotalInr}", bold = true)
+                BreakdownRow(
+                    "Pre-Charged Now ($selectedPaymentMethod)",
+                    "₹${breakdown.advancePayableInr}",
+                    highlight = true
                 )
+                BreakdownRow("Remaining Balance at Salon", "₹${breakdown.remainingBalanceInr}", bold = true)
             }
         }
 
+        // Action Buttons: Gateway Checkout + Direct UPI + WhatsApp Share
         Button(
             onClick = {
-                viewModel.confirmSmartAppointment(
-                    provider = provider,
-                    selectedServices = selectedServices.toList(),
-                    staffId = selectedStaffId,
-                    staffName = staffDisplayName,
-                    staffAddonInr = staffAddon,
-                    dateIso = selectedDate,
-                    timeSlot = selectedTimeSlot,
-                    couponCode = couponInput,
-                    paymentMethod = selectedPaymentMethod,
-                    paymentType = selectedPaymentType,
-                    isHomeService = bookAsHomeService,
-                    onComplete = onBack
-                )
+                if (selectedPaymentType == "PAY_AT_VENUE" || breakdown.advancePayableInr == 0) {
+                    viewModel.confirmSmartAppointment(
+                        provider = provider,
+                        selectedServices = selectedServices.toList(),
+                        staffId = selectedStaffId,
+                        staffName = staffDisplayName,
+                        staffAddonInr = staffAddon,
+                        dateIso = selectedDate,
+                        timeSlot = selectedTimeSlot,
+                        couponCode = couponInput,
+                        paymentMethod = selectedPaymentMethod,
+                        paymentType = "PAY_AT_VENUE",
+                        prechargeCustomPercent = 0,
+                        isHomeService = bookAsHomeService,
+                        onComplete = onBack
+                    )
+                } else {
+                    showGatewayModal = true
+                }
             },
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
@@ -625,64 +688,106 @@ fun ProviderDetailAndBookingScreen(
                 .height(56.dp)
                 .testTag("confirm_smart_booking_button")
         ) {
+            Icon(Icons.Default.Payment, contentDescription = "Pay", modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Confirm Booking • Pay ₹${breakdown.advancePayableInr} Now (Balance ₹${breakdown.remainingBalanceInr})",
+                text = "Pre-Charge ₹${breakdown.advancePayableInr} & Confirm Package (Balance ₹${breakdown.remainingBalanceInr})",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold
             )
         }
 
-        // Verified Reviews Section
-        Text(
-            text = "Verified Customer Reviews",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-        val providerReviews = reviews.filter { it.providerId == provider.id }
-        if (providerReviews.isEmpty()) {
+        Spacer(modifier = Modifier.height(28.dp))
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun MultiGatewayPaymentDialog(
+    amountInr: Int,
+    initialGateway: String,
+    serviceDescription: String,
+    onDismiss: () -> Unit,
+    onLaunchUpiApp: () -> Unit,
+    onPaymentAuthorized: (String) -> Unit
+) {
+    var chosenMethod by remember { mutableStateOf(initialGateway) }
+    var upiIdInput by remember { mutableStateOf("customer@okicici") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
             Text(
-                text = "Completed bookings unlock verified star ratings & staff reviews.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = "UPI & Multi-Gateway Pre-Charge • ₹$amountInr",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
             )
-        } else {
-            providerReviews.forEach { rev ->
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth()
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = serviceDescription,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "★ ${rev.rating}/5 • Staff (${rev.staffName}): ★ ${rev.staffRating}/5",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = GroomlySuccessMint
-                            )
-                            Text(
-                                text = "Verified Booking",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(text = rev.comment, style = MaterialTheme.typography.bodyMedium)
-                        if (rev.photoTag.isNotBlank()) {
-                            Text(
-                                text = "📸 Photo Tag: ${rev.photoTag}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    listOf(
+                        "UPI" to "UPI / QR",
+                        "CARD" to "Razorpay / Stripe",
+                        "NET_BANKING" to "NetBanking",
+                        "WALLET" to "Groomly Wallet"
+                    ).forEach { (key, label) ->
+                        FilterChip(
+                            selected = chosenMethod == key,
+                            onClick = { chosenMethod = key },
+                            label = { Text(label) }
+                        )
                     }
                 }
+
+                if (chosenMethod == "UPI") {
+                    OutlinedTextField(
+                        value = upiIdInput,
+                        onValueChange = { upiIdInput = it },
+                        label = { Text("Enter VPA / UPI ID (e.g. name@okaxis)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedButton(
+                        onClick = onLaunchUpiApp,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("📲 Open Installed UPI App (GPay / PhonePe / Paytm)")
+                    }
+                } else {
+                    Text(
+                        text = "256-Bit Encrypted Gateway Checkout via Razorpay & Stripe International.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GroomlySuccessMint
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onPaymentAuthorized(chosenMethod) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = GroomlyElectricLime,
+                    contentColor = GroomlyObsidian
+                )
+            ) {
+                Text("Authorize ₹$amountInr & Book", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
             }
         }
-        Spacer(modifier = Modifier.height(32.dp))
-    }
+    )
 }
 
 @Composable
@@ -742,7 +847,6 @@ fun LiveQueueQrDialog(
                     style = MaterialTheme.typography.labelLarge,
                     color = GroomlySuccessMint
                 )
-                // Custom Canvas QR Matrix
                 Box(
                     modifier = Modifier
                         .size(148.dp)

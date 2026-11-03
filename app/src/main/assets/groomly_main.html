@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>GROOMLY • International Multi-Vendor Grooming & Beauty</title>
+  <style>
+    :root {
+      --bg-obsidian: #08090C;
+      --bg-card: rgba(22, 25, 34, 0.78);
+      --bg-glass: rgba(255, 255, 255, 0.05);
+      --border-glass: rgba(255, 255, 255, 0.11);
+      --lime: #CCFF00;
+      --violet: #8B5CF6;
+      --cyan: #38BDF8;
+      --mint: #34D399;
+      --ivory: #F8F6F0;
+      --muted: #9BA1B0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-obsidian);
+      color: var(--ivory);
+      overflow-x: hidden;
+      padding-bottom: 48px;
+    }
+
+    /* Animated MNC Aurora Background */
+    .aurora-wrap {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(75px);
+      opacity: 0.28;
+      animation: floatOrb 11s ease-in-out infinite alternate;
+    }
+    .orb-1 {
+      width: 280px;
+      height: 280px;
+      background: var(--lime);
+      top: -60px;
+      right: -50px;
+    }
+    .orb-2 {
+      width: 320px;
+      height: 320px;
+      background: var(--violet);
+      top: 320px;
+      left: -100px;
+      animation-delay: -4s;
+    }
+    .orb-3 {
+      width: 240px;
+      height: 240px;
+      background: var(--cyan);
+      bottom: 80px;
+      right: -60px;
+      animation-delay: -7s;
+    }
+
+    @keyframes floatOrb {
+      0% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(24px, -28px) scale(1.12); }
+      100% { transform: translate(-18px, 22px) scale(0.94); }
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(204, 255, 0, 0.45); }
+      50% { box-shadow: 0 0 0 10px rgba(204, 255, 0, 0); }
+    }
+
+    @keyframes tickerMove {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      padding: 14px 16px;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    /* Kinetic Marquee Ticker */
+    .ticker-bar {
+      background: linear-gradient(90deg, rgba(204,255,0,0.14), rgba(139,92,246,0.18));
+      border: 1px solid var(--border-glass);
+      border-radius: 999px;
+      overflow: hidden;
+      white-space: nowrap;
+      padding: 7px 0;
+      margin-bottom: 14px;
+    }
+    .ticker-track {
+      display: inline-block;
+      animation: tickerMove 22s linear infinite;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      color: var(--lime);
+    }
+
+    /* Location Radar Bar */
+    .glass-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid var(--border-glass);
+      border-radius: 22px;
+      padding: 16px;
+      margin-bottom: 16px;
+      transition: transform 0.22s ease, border-color 0.22s ease;
+    }
+
+    .loc-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .loc-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--mint);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--mint);
+      animation: pulseGlow 1.8s infinite;
+    }
+    .gps-btn {
+      background: rgba(204, 255, 0, 0.14);
+      color: var(--lime);
+      border: 1px solid rgba(204, 255, 0, 0.4);
+      border-radius: 12px;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .hub-row {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: none;
+    }
+    .hub-chip {
+      flex-shrink: 0;
+      padding: 7px 13px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--bg-glass);
+      border: 1px solid var(--border-glass);
+      color: var(--ivory);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .hub-chip.active {
+      background: var(--lime);
+      color: #08090C;
+      border-color: var(--lime);
+      font-weight: 800;
+    }
+
+    /* Hero Editorial Card */
+    .hero-card {
+      background: linear-gradient(135deg, rgba(24,28,40,0.95) 0%, rgba(44,24,78,0.88) 55%, rgba(15,20,28,0.96) 100%);
+      border: 1px solid rgba(204, 255, 0, 0.28);
+      border-radius: 26px;
+      padding: 22px 18px;
+      margin-bottom: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-pill {
+      display: inline-block;
+      background: var(--lime);
+      color: #08090C;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 999px;
+      letter-spacing: 0.7px;
+      margin-bottom: 10px;
+    }
+    .hero-title {
+      font-size: 25px;
+      line-height: 1.18;
+      font-weight: 800;
+      margin-bottom: 8px;
+      background: linear-gradient(90deg, #FFFFFF, #CCFF00);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero-sub {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.45;
+      margin-bottom: 14px;
+    }
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .stat-box {
+      background: rgba(8, 9, 12, 0.55);
+      border: 1px solid var(--border-glass);
+      border-radius: 14px;
+      padding: 9px;
+      text-align: center;
+    }
+    .stat-val {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--lime);
+    }
+    .stat-lbl {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* Section Titles */
+    .sec-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin: 16px 0 10px;
+    }
+    .sec-title {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+    }
+    .sec-tag {
+      font-size: 11px;
+      color: var(--lime);
+      font-weight: 700;
+    }
+
+    /* SELF-CREATED CUSTOM PACKAGE BUILDER */
+    .byop-card {
+      background: linear-gradient(160deg, rgba(20, 24, 34, 0.94), rgba(28, 22, 48, 0.92));
+      border: 1.5px solid rgba(204, 255, 0, 0.42);
+      border-radius: 24px;
+      padding: 18px;
+      margin-bottom: 18px;
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+    }
+    .byop-badge {
+      display: inline-block;
+      background: rgba(139, 92, 246, 0.25);
+      border: 1px solid var(--violet);
+      color: #DDD6FE;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+    .service-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-glass);
+      border-radius: 15px;
+      padding: 11px 13px;
+      margin-top: 8px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+    .service-item.selected {
+      background: rgba(204, 255, 0, 0.11);
+      border-color: var(--lime);
+      transform: translateY(-1px);
+    }
+    .srv-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .chk-circle {
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      border: 2px solid var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 900;
+      color: #08090C;
+    }
+    .service-item.selected .chk-circle {
+      background: var(--lime);
+      border-color: var(--lime);
+    }
+    .srv-name {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--ivory);
+    }
+    .srv-meta {
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .srv-price {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--lime);
+    }
+
+    /* Pre-charge & Gateway selectors */
+    .sub-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin: 14px 0 7px;
+    }
+    .pill-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+    }
+    .opt-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-glass);
+      border-radius: 12px;
+      padding: 9px 6px;
+      text-align: center;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--ivory);
+      cursor: pointer;
+    }
+    .opt-pill.active {
+      background: var(--violet);
+      border-color: #C4B5FD;
+      color: #FFFFFF;
+    }
+
+    .receipt-box {
+      background: rgba(8, 9, 12, 0.72);
+      border: 1px dashed rgba(204, 255, 0, 0.45);
+      border-radius: 16px;
+      padding: 13px;
+      margin-top: 14px;
+    }
+    .receipt-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12.5px;
+      margin-bottom: 5px;
+      color: var(--muted);
+    }
+    .receipt-row.total {
+      font-size: 14.5px;
+      font-weight: 800;
+      color: var(--ivory);
+      border-top: 1px solid var(--border-glass);
+      padding-top: 7px;
+      margin-top: 6px;
+    }
+    .receipt-row.highlight {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--lime);
+    }
+
+    .cta-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 9px;
+      margin-top: 14px;
+    }
+    .btn-primary {
+      background: var(--lime);
+      color: #08090C;
+      border: none;
+      border-radius: 14px;
+      padding: 14px;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      width: 100%;
+      box-shadow: 0 6px 20px rgba(204, 255, 0, 0.25);
+    }
+    .btn-row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+    }
+    .btn-wa {
+      background: rgba(52, 211, 153, 0.16);
+      color: var(--mint);
+      border: 1px solid var(--mint);
+      border-radius: 13px;
+      padding: 11px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .btn-upi {
+      background: rgba(56, 189, 248, 0.16);
+      color: var(--cyan);
+      border: 1px solid var(--cyan);
+      border-radius: 13px;
+      padding: 11px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    /* Provider Cards */
+    .prov-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      border-radius: 20px;
+      padding: 15px;
+      margin-bottom: 12px;
+    }
+    .prov-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .v-tag {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: var(--lime);
+      color: #08090C;
+    }
+    .dist-tag {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--cyan);
+    }
+    .prov-name {
+      font-size: 17px;
+      font-weight: 800;
+      margin-bottom: 3px;
+    }
+    .prov-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .prov-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .btn-outline {
+      flex: 1;
+      background: transparent;
+      color: var(--ivory);
+      border: 1px solid var(--border-glass);
+      border-radius: 11px;
+      padding: 9px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-fill {
+      flex: 1;
+      background: var(--ivory);
+      color: #08090C;
+      border: none;
+      border-radius: 11px;
+      padding: 9px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="aurora-wrap">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <div class="container">
+    <!-- Kinetic Ticker -->
+    <div class="ticker-bar">
+      <div class="ticker-track">
+        ✦ INTERNATIONAL MNC DESIGN SYSTEM &nbsp;•&nbsp; SELF-CREATED HAIRCUT PACKAGING (UP TO 20% OFF) &nbsp;•&nbsp; INSTANT UPI &amp; RAZORPAY PRE-CHARGE &nbsp;•&nbsp; OFFICIAL WHATSAPP CONFIRMATIONS &nbsp;•&nbsp; LIVE GPS LOCATION BOOKING ✦
+      </div>
+    </div>
+
+    <!-- Location-Based Booking System Radar -->
+    <div class="glass-card">
+      <div class="loc-header">
+        <div>
+          <div class="loc-badge">
+            <span class="pulse-dot"></span>
+            <span id="gpsStatusText">LIVE GPS RADAR ACTIVE</span>
+          </div>
+          <div id="activeCityLabel" style="font-size:15px;font-weight:800;margin-top:3px;">
+            Indiranagar, Bengaluru (12.978° N, 77.640° E)
+          </div>
+        </div>
+        <button class="gps-btn" onclick="detectLiveGps()">📍 Detect GPS</button>
+      </div>
+      <div class="hub-row">
+        <div class="hub-chip active" onclick="selectHub(0, 'Indiranagar, Bengaluru', 12.9784, 77.6408, this)">🇮🇳 Bengaluru</div>
+        <div class="hub-chip" onclick="selectHub(1, 'Bandra West, Mumbai', 19.0596, 72.8295, this)">🇮🇳 Mumbai</div>
+        <div class="hub-chip" onclick="selectHub(2, 'Downtown Marina, Dubai', 25.1972, 55.2744, this)">🇦🇪 Dubai</div>
+        <div class="hub-chip" onclick="selectHub(3, 'Soho Mayfair, London', 51.5136, -0.1365, this)">🇬🇧 London</div>
+      </div>
+    </div>
+
+    <!-- Hero Banner -->
+    <div class="hero-card">
+      <span class="hero-pill">INTERNATIONAL LUXURY GROOMING &amp; BEAUTY</span>
+      <h1 class="hero-title">Come for a Haircut. Build Your Own Custom Package.</h1>
+      <p class="hero-sub">
+        Select your base haircut, add any salon services according to your wishes, choose your pre-charge split via UPI or Razorpay, and get instant WhatsApp confirmation.
+      </p>
+      <div class="hero-stats">
+        <div class="stat-box">
+          <div class="stat-val" id="statDiscount">15% OFF</div>
+          <div class="stat-lbl">Custom Pack Bonus</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">UPI / Card</div>
+          <div class="stat-lbl">Instant Pre-Charge</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">WhatsApp</div>
+          <div class="stat-lbl">Live Ticket &amp; Alert</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SELF-CREATED CUSTOM PACKAGE BUILDER (BYOP) -->
+    <div class="sec-head">
+      <div class="sec-title">✨ Self-Created Package Builder</div>
+      <div class="sec-tag" id="tierBadge">2+ Services = Auto Discount</div>
+    </div>
+
+    <div class="byop-card">
+      <span class="byop-badge">ROYAL GENTS SALON • SELF-CREATED PACKAGING OPTION</span>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px;">
+        Tap to add or remove shop services to your Haircut visit. Pre-charged according to your wishes:
+      </div>
+
+      <div id="servicesContainer"></div>
+
+      <!-- Pre-Charge Split Choice -->
+      <div class="sub-label">1. Choose Your Pre-Charge Option</div>
+      <div class="pill-grid" id="prechargeGrid">
+        <div class="opt-pill active" onclick="setPrecharge(20, this)">20% Advance</div>
+        <div class="opt-pill" onclick="setPrecharge(50, this)">50% Pre-Charge</div>
+        <div class="opt-pill" onclick="setPrecharge(100, this)">100% Full Pre-Pay</div>
+      </div>
+
+      <!-- Payment Gateway Choice -->
+      <div class="sub-label">2. Select UPI or Author Payment Gateway</div>
+      <div class="pill-grid" id="gatewayGrid">
+        <div class="opt-pill active" onclick="setGateway('UPI', this)">⚡ UPI App Intent</div>
+        <div class="opt-pill" onclick="setGateway('RAZORPAY', this)">🛡️ Razorpay</div>
+        <div class="opt-pill" onclick="setGateway('STRIPE_CARD', this)">💳 Intl. Card</div>
+      </div>
+
+      <!-- Live Package Receipt Breakdown -->
+      <div class="receipt-box">
+        <div class="receipt-row">
+          <span>Selected Services (<span id="srvCount">2</span> items • <span id="srvMins">55</span> mins)</span>
+          <span id="rawSubtotal">₹550</span>
+        </div>
+        <div class="receipt-row" style="color:var(--mint);">
+          <span id="discountLabel">Self-Created Package Discount (10%)</span>
+          <span id="discountVal">- ₹55</span>
+        </div>
+        <div class="receipt-row total">
+          <span>Net Custom Package Total</span>
+          <span id="netTotal">₹495</span>
+        </div>
+        <div class="receipt-row highlight">
+          <span>Pre-Charged Now (<span id="prePctLabel">20%</span> via <span id="gwLabel">UPI</span>)</span>
+          <span id="prechargeNow">₹100</span>
+        </div>
+        <div class="receipt-row">
+          <span>Remaining Balance at Salon Chair</span>
+          <span id="balanceLater">₹395</span>
+        </div>
+      </div>
+
+      <!-- Action Buttons Bridged to Native Android -->
+      <div class="cta-grid">
+        <button class="btn-primary" onclick="submitCustomPackageBooking()">
+          ⚡ Pre-Charge <span id="btnPreAmt">₹100</span> &amp; Confirm Custom Package
+        </button>
+        <div class="btn-row-2">
+          <button class="btn-upi" onclick="triggerDirectUpiIntent()">
+            📲 Pay via UPI App
+          </button>
+          <button class="btn-wa" onclick="triggerWhatsAppShare()">
+            💬 WhatsApp Receipt
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Location-Sorted Multi-Vendor Studios -->
+    <div class="sec-head">
+      <div class="sec-title">📍 Location-Sorted Flagship Studios</div>
+      <div class="sec-tag">Nearest First</div>
+    </div>
+    <div id="providersList"></div>
+  </div>
+
+  <script>
+    const shopServices = [
+      { id: 'cut', name: 'Executive Skin Fade & Haircut (Base)', mins: 35, price: 350, selected: true },
+      { id: 'beard', name: 'Hot Towel Beard Sculpt & Razor Lineup', mins: 20, price: 200, selected: true },
+      { id: 'facial', name: 'O3+ Activated Charcoal Detan Facial', mins: 35, price: 450, selected: false },
+      { id: 'spa', name: 'Moroccanoil Hair Spa & Head Massage', mins: 30, price: 399, selected: false },
+      { id: 'cleanup', name: 'Express Vitamin-C Face Cleanup', mins: 20, price: 250, selected: false },
+      { id: 'pedi', name: 'Detox Matcha Foot & Nail Grooming', mins: 30, price: 349, selected: false }
+    ];
+
+    const providersData = [
+      {
+        id: 'prov_royal_gents',
+        name: 'Royal Gents Salon',
+        vertical: 'MENS BARBER & LOUNGE',
+        sub: 'Ahmed (Senior Barber) • Self-Created Haircut Packages • Live Queue #11',
+        lat: 12.9789,
+        lng: 77.6414,
+        phone: '+919845011223'
+      },
+      {
+        id: 'prov_velvet_bridal',
+        name: 'Maison Velvet Beauty & Bridal',
+        vertical: 'WOMENS & BRIDAL STUDIO',
+        sub: 'Zara Merchant • Couture Haircuts, 24K Gold Facial & HD Airbrush Bridal',
+        lat: 12.9719,
+        lng: 77.5993,
+        phone: '+919845044556'
+      },
+      {
+        id: 'prov_monochrome_unisex',
+        name: 'MONOCHROME Unisex Studio',
+        vertical: 'GEN-Z UNISEX LAB',
+        sub: 'Kabir Sen • Restyle Cuts, Ammonia-Free Global Color & Walk-In Queue',
+        lat: 12.9352,
+        lng: 77.6245,
+        phone: '+919845077889'
+      },
+      {
+        id: 'prov_aura_derma',
+        name: 'AURA Dermatology & Skin Clinic',
+        vertical: 'VERIFIED MEDICAL DERMA',
+        sub: 'Dr. Aarav Mehta MD • HydraFacial MD, Laser Toning & Dermoscopy',
+        lat: 12.9716,
+        lng: 77.5961,
+        phone: '+918041129900'
+      }
+    ];
+
+    let prechargePercent = 20;
+    let selectedGateway = 'UPI';
+    let userLat = 12.9784;
+    let userLng = 77.6408;
+
+    function renderServices() {
+      const container = document.getElementById('servicesContainer');
+      container.innerHTML = '';
+      shopServices.forEach((srv, idx) => {
+        const div = document.createElement('div');
+        div.className = 'service-item' + (srv.selected ? ' selected' : '');
+        div.onclick = () => toggleService(idx);
+        div.innerHTML = `
+          <div class="srv-left">
+            <div class="chk-circle">${srv.selected ? '✓' : '+'}</div>
+            <div>
+              <div class="srv-name">${srv.name}</div>
+              <div class="srv-meta">${srv.mins} mins • Pre-charge eligible</div>
+            </div>
+          </div>
+          <div class="srv-price">₹${srv.price}</div>
+        `;
+        container.appendChild(div);
+      });
+      recalcPackage();
+    }
+
+    function toggleService(index) {
+      const activeCount = shopServices.filter(s => s.selected).length;
+      if (shopServices[index].selected && activeCount <= 1) {
+        return; // Keep at least 1 base service
+      }
+      shopServices[index].selected = !shopServices[index].selected;
+      renderServices();
+    }
+
+    function setPrecharge(pct, el) {
+      prechargePercent = pct;
+      document.querySelectorAll('#prechargeGrid .opt-pill').forEach(p => p.classList.remove('active'));
+      el.classList.add('active');
+      recalcPackage();
+    }
+
+    function setGateway(gw, el) {
+      selectedGateway = gw;
+      document.querySelectorAll('#gatewayGrid .opt-pill').forEach(p => p.classList.remove('active'));
+      el.classList.add('active');
+      recalcPackage();
+    }
+
+    function recalcPackage() {
+      const chosen = shopServices.filter(s => s.selected);
+      const count = chosen.length;
+      const mins = chosen.reduce((acc, s) => acc + s.mins, 0);
+      const raw = chosen.reduce((acc, s) => acc + s.price, 0);
+
+      let discPct = 0;
+      if (count === 2) discPct = 10;
+      else if (count === 3) discPct = 15;
+      else if (count >= 4) discPct = 20;
+
+      const discAmt = Math.round((raw * discPct) / 100);
+      const net = Math.max(0, raw - discAmt);
+      const preNow = prechargePercent === 100
+        ? net
+        : Math.max(100, Math.round((net * prechargePercent) / 100));
+      const balance = Math.max(0, net - preNow);
+
+      document.getElementById('srvCount').innerText = count;
+      document.getElementById('srvMins').innerText = mins;
+      document.getElementById('rawSubtotal').innerText = '₹' + raw;
+      document.getElementById('discountLabel').innerText = `Self-Created Package Discount (${discPct}%)`;
+      document.getElementById('discountVal').innerText = '- ₹' + discAmt;
+      document.getElementById('netTotal').innerText = '₹' + net;
+      document.getElementById('prePctLabel').innerText = prechargePercent + '%';
+      document.getElementById('gwLabel').innerText = selectedGateway;
+      document.getElementById('prechargeNow').innerText = '₹' + preNow;
+      document.getElementById('balanceLater').innerText = '₹' + balance;
+      document.getElementById('btnPreAmt').innerText = '₹' + preNow;
+      document.getElementById('tierBadge').innerText = discPct > 0 ? `🎉 ${discPct}% Custom Bundle Applied!` : 'Add 1 more for 10% OFF';
+
+      return { chosen, count, mins, raw, discAmt, net, preNow, balance };
+    }
+
+    function haversineKm(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return Math.max(0.4, Math.round(R * c * 10) / 10);
+    }
+
+    function renderProviders() {
+      const listEl = document.getElementById('providersList');
+      listEl.innerHTML = '';
+      const sorted = providersData.map(p => ({
+        ...p,
+        dist: haversineKm(userLat, userLng, p.lat, p.lng)
+      })).sort((a, b) => a.dist - b.dist);
+
+      sorted.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'prov-card';
+        card.innerHTML = `
+          <div class="prov-top">
+            <span class="v-tag">${p.vertical}</span>
+            <span class="dist-tag">📍 ${p.dist} km away</span>
+          </div>
+          <div class="prov-name">${p.name}</div>
+          <div class="prov-sub">${p.sub}</div>
+          <div class="prov-actions">
+            <button class="btn-outline" onclick="joinQueueFromHtml('${p.id}')">Join Live Queue</button>
+            <button class="btn-fill" onclick="openProviderFromHtml('${p.id}')">Custom Book &rarr;</button>
+          </div>
+        `;
+        listEl.appendChild(card);
+      });
+    }
+
+    function selectHub(idx, label, lat, lng, el) {
+      userLat = lat;
+      userLng = lng;
+      document.querySelectorAll('.hub-chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('activeCityLabel').innerText = `${label} (${lat.toFixed(3)}° N, ${lng.toFixed(3)}° E)`;
+      renderProviders();
+      if (window.GroomlyBridge && window.GroomlyBridge.onCitySelected) {
+        window.GroomlyBridge.onCitySelected(label, lat, lng);
+      }
+    }
+
+    function detectLiveGps() {
+      document.getElementById('gpsStatusText').innerText = 'ACQUIRING SATELLITE GPS LOCK...';
+      if (window.GroomlyBridge && window.GroomlyBridge.requestLiveGpsLocation) {
+        window.GroomlyBridge.requestLiveGpsLocation();
+      }
+    }
+
+    // Called from Android after LocationManager GPS fix
+    function updateGpsFromAndroid(cityLabel, lat, lng) {
+      userLat = lat;
+      userLng = lng;
+      document.getElementById('gpsStatusText').innerText = 'LIVE DEVICE GPS LOCKED';
+      document.getElementById('activeCityLabel').innerText = `${cityLabel} (${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E)`;
+      renderProviders();
+    }
+
+    function submitCustomPackageBooking() {
+      const state = recalcPackage();
+      const summary = 'Self-Created Package: ' + state.chosen.map(s => s.name.split(' (')[0]).join(' + ');
+      if (window.GroomlyBridge && window.GroomlyBridge.bookCustomPackageFromHtml) {
+        window.GroomlyBridge.bookCustomPackageFromHtml(
+          'prov_royal_gents',
+          'Royal Gents Salon',
+          summary,
+          state.mins,
+          state.net,
+          state.preNow,
+          state.balance,
+          selectedGateway
+        );
+      }
+    }
+
+    function triggerDirectUpiIntent() {
+      const state = recalcPackage();
+      const summary = 'Groomly Custom Package (' + state.count + ' services)';
+      if (window.GroomlyBridge && window.GroomlyBridge.launchUpiFromHtml) {
+        window.GroomlyBridge.launchUpiFromHtml(state.preNow, summary);
+      }
+    }
+
+    function triggerWhatsAppShare() {
+      const state = recalcPackage();
+      const items = state.chosen.map(s => s.name.split(' (')[0]).join(', ');
+      const msg = `Hi Royal Gents Salon! I built my Self-Created Groomly Package (${items}). Net Total: ₹${state.net} | Pre-Charged Now: ₹${state.preNow} (${selectedGateway}) | Balance at Salon: ₹${state.balance}.`;
+      if (window.GroomlyBridge && window.GroomlyBridge.sendWhatsAppFromHtml) {
+        window.GroomlyBridge.sendWhatsAppFromHtml('+919845011223', msg);
+      }
+    }
+
+    function openProviderFromHtml(providerId) {
+      if (window.GroomlyBridge && window.GroomlyBridge.openProviderNative) {
+        window.GroomlyBridge.openProviderNative(providerId);
+      }
+    }
+
+    function joinQueueFromHtml(providerId) {
+      if (window.GroomlyBridge && window.GroomlyBridge.joinQueueNative) {
+        window.GroomlyBridge.joinQueueNative(providerId);
+      }
+    }
+
+    renderServices();
+    renderProviders();
+  </script>
+</body>
+</html>

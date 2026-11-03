@@ -156,6 +156,8 @@ data class MarketplaceProvider(
     val genderFocus: String, // MENS, WOMENS, UNISEX
     val address: String,
     val distanceKm: Double,
+    val latitude: Double = 12.9716,
+    val longitude: Double = 77.6412,
     val rating: Double,
     val reviewCount: Int,
     val openingHours: String,
@@ -173,6 +175,14 @@ data class MarketplaceProvider(
     val staff: List<StaffMemberProfile>,
     val services: List<MarketplaceServiceItem>,
     val offers: List<String>
+)
+
+data class LocationHub(
+    val id: String,
+    val name: String,
+    val country: String,
+    val latitude: Double,
+    val longitude: Double
 )
 
 data class CouponItem(

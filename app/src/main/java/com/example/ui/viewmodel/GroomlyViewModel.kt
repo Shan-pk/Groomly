@@ -1,8 +1,10 @@
 package com.example.ui.viewmodel
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.integration.PaymentAndWhatsAppService
 import com.example.data.model.AppRoleMode
 import com.example.data.model.Appointment
 import com.example.data.model.CouponItem
@@ -32,6 +34,9 @@ sealed interface UiState<out T> {
 
 data class BookingBreakdown(
     val subtotalInr: Int,
+    val selfPackageDiscountPercent: Int,
+    val selfPackageDiscountInr: Int,
+    val couponDiscountInr: Int,
     val discountInr: Int,
     val netTotalInr: Int,
     val advancePayableInr: Int,
@@ -100,8 +105,22 @@ class GroomlyViewModel(
     private val _isDarkTheme = MutableStateFlow(true)
     val isDarkTheme: StateFlow<Boolean> = _isDarkTheme.asStateFlow()
 
+    // HTML5 Main Page Mode (Enabled by default per user suggestion #1)
+    private val _isHtmlMainPageEnabled = MutableStateFlow(true)
+    val isHtmlMainPageEnabled: StateFlow<Boolean> = _isHtmlMainPageEnabled.asStateFlow()
+
     private val _statusBannerMessage = MutableStateFlow<String?>(null)
     val statusBannerMessage: StateFlow<String?> = _statusBannerMessage.asStateFlow()
+
+    // --- LOCATION-BASED BOOKING SYSTEM STATE ---
+    private val _activeLocationLabel = MutableStateFlow("Indiranagar, Bengaluru")
+    val activeLocationLabel: StateFlow<String> = _activeLocationLabel.asStateFlow()
+
+    private val _userLatitude = MutableStateFlow(12.9784)
+    val userLatitude: StateFlow<Double> = _userLatitude.asStateFlow()
+
+    private val _userLongitude = MutableStateFlow(77.6408)
+    val userLongitude: StateFlow<Double> = _userLongitude.asStateFlow()
 
     // --- MARKETPLACE DISCOVERY & ADMIN DYNAMIC STATE ---
     private val _categories = MutableStateFlow(GroomlyMarketplaceCatalog.initialCategories)
@@ -113,10 +132,10 @@ class GroomlyViewModel(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _selectedGenderFilter = MutableStateFlow("ALL") // ALL, MENS, WOMENS, UNISEX
+    private val _selectedGenderFilter = MutableStateFlow("ALL")
     val selectedGenderFilter: StateFlow<String> = _selectedGenderFilter.asStateFlow()
 
-    private val _selectedVerticalFilter = MutableStateFlow("ALL") // ALL, SALON, BRIDAL, DIETITIAN, DERMATOLOGY
+    private val _selectedVerticalFilter = MutableStateFlow("ALL")
     val selectedVerticalFilter: StateFlow<String> = _selectedVerticalFilter.asStateFlow()
 
     private val _onlyHomeService = MutableStateFlow(false)
@@ -132,11 +151,11 @@ class GroomlyViewModel(
     private val _selectedProviderForDetail = MutableStateFlow<MarketplaceProvider?>(null)
     val selectedProviderForDetail: StateFlow<MarketplaceProvider?> = _selectedProviderForDetail.asStateFlow()
 
-    // WhatsApp Business Notification Log (live in-session + triggered on booking/queue events)
+    // WhatsApp Business Notification Log
     private val _whatsappLogs = MutableStateFlow(
         listOf(
-            "WhatsApp API [DELIVERED] • Welcome to Groomly! OTP & Instant Booking Alerts active.",
-            "WhatsApp API [DELIVERED] • Royal Gents Salon: Token #11 is now being served."
+            "WhatsApp Cloud API [DELIVERED] • Welcome to Groomly! Self-Created Haircut Packages & UPI Pre-Charge active.",
+            "WhatsApp Cloud API [DELIVERED] • Royal Gents Salon: Token #11 is now being served."
         )
     )
     val whatsappLogs: StateFlow<List<String>> = _whatsappLogs.asStateFlow()
@@ -159,26 +178,24 @@ class GroomlyViewModel(
             )
             val existingAppts = repository.getUserAppointments().getOrNull().orEmpty()
             if (existingAppts.isEmpty()) {
-                // Seed 1 upcoming salon package booking (showing ₹500 -> ₹100 advance -> ₹400 balance)
                 repository.createAppointment(
                     providerId = "prov_royal_gents",
                     providerName = "Royal Gents Salon",
                     vertical = "SALON",
-                    serviceSummary = "Premium Grooming Package (Haircut + Beard + Facial + Wash)",
+                    serviceSummary = "Self-Created Package: Executive Skin Fade + Hot Towel Beard Sculpt + Charcoal Facial",
                     staffId = "staff_ahmed",
                     staffName = "Ahmed • Senior Barber",
                     dateIso = "2026-11-05",
                     timeSlot = "11:45 AM",
-                    durationMinutes = 75,
-                    totalAmountInr = 500,
-                    advancePaidInr = 100,
-                    remainingBalanceInr = 400,
+                    durationMinutes = 90,
+                    totalAmountInr = 750,
+                    advancePaidInr = 150,
+                    remainingBalanceInr = 600,
                     paymentMethod = "UPI",
                     paymentType = "ADVANCE",
-                    couponCode = "GROOM100",
+                    couponCode = "BYOP18",
                     isHomeService = false
                 )
-                // Seed 1 live queue ticket
                 repository.joinLiveQueue(
                     providerId = "prov_royal_gents",
                     providerName = "Royal Gents Salon",
@@ -188,7 +205,6 @@ class GroomlyViewModel(
                     currentlyServingNumber = 11,
                     estimatedWaitMinutes = 24
                 )
-                // Seed 1 registered provider business for the Provider Studio & Admin Panel
                 repository.registerProviderBusiness(
                     ownerName = userDisplayName.ifBlank { "Ahmed Khan" },
                     businessName = "Royal Gents Flagship Studio",
@@ -202,7 +218,6 @@ class GroomlyViewModel(
                     commissionRatePercent = 15,
                     subscriptionTier = "GROWTH"
                 )
-                // Seed 1 verified customer review
                 repository.submitReview(
                     appointmentId = "seed_completed_1",
                     providerId = "prov_royal_gents",
@@ -210,8 +225,8 @@ class GroomlyViewModel(
                     staffName = "Ahmed • Senior Barber",
                     rating = 5,
                     staffRating = 5,
-                    comment = "Sharpest skin fade in Bengaluru! Zero wait with the smart slot engine and super clean hot towel ritual.",
-                    photoTag = "Zero Skin Fade + Beard Lineup"
+                    comment = "Built my own Haircut + Beard + Charcoal Facial package and pre-charged via UPI! Zero waiting at the chair.",
+                    photoTag = "Self-Created Grooming Package"
                 )
             }
         }
@@ -231,6 +246,10 @@ class GroomlyViewModel(
 
     fun toggleTheme() {
         _isDarkTheme.value = !_isDarkTheme.value
+    }
+
+    fun toggleHtmlMainPage() {
+        _isHtmlMainPageEnabled.value = !_isHtmlMainPageEnabled.value
     }
 
     fun clearStatusBanner() {
@@ -265,39 +284,76 @@ class GroomlyViewModel(
         _selectedProviderForDetail.value = provider
     }
 
-    // --- SMART SLOT & PAYMENT BREAKDOWN CALCULATOR ---
+    // --- LOCATION-BASED BOOKING SYSTEM ---
+    fun updateActiveGpsCoordinates(cityLabel: String, latitude: Double, longitude: Double) {
+        _activeLocationLabel.value = cityLabel
+        _userLatitude.value = latitude
+        _userLongitude.value = longitude
+        topUpWalletAndPreferences(newCity = cityLabel)
+        _statusBannerMessage.value =
+            "📍 Location Locked: $cityLabel (${String.format("%.3f", latitude)}°N, ${String.format("%.3f", longitude)}°E)"
+    }
+
+    fun getLocationSortedProviders(): List<MarketplaceProvider> {
+        val lat = _userLatitude.value
+        val lng = _userLongitude.value
+        return GroomlyMarketplaceCatalog.providers.map { p ->
+            val dynamicDist = GroomlyMarketplaceCatalog.calculateHaversineKm(lat, lng, p.latitude, p.longitude)
+            p.copy(distanceKm = dynamicDist)
+        }.sortedBy { it.distanceKm }
+    }
+
+    // --- SELF-CREATED PACKAGE BUILDER & PRE-CHARGE CALCULATOR ---
     fun calculateBookingBreakdown(
         selectedServices: List<MarketplaceServiceItem>,
         staffAddonInr: Int,
         couponCode: String,
-        paymentType: String // ADVANCE, FULL, PAY_AT_VENUE
+        paymentType: String, // ADVANCE (20%), HALF (50%), FULL (100%), PAY_AT_VENUE
+        prechargeCustomPercent: Int = 20
     ): BookingBreakdown {
         val rawServicesTotal = selectedServices.sumOf { it.discountPriceInr }
         val subtotal = (rawServicesTotal + staffAddonInr).coerceAtLeast(0)
-        val matchedCoupon = _coupons.value.firstOrNull {
-            it.code.equals(couponCode.trim(), ignoreCase = true) && subtotal >= it.minOrderInr
+
+        // Self-Created Custom Package Tier Discount (when customer combines Haircut + other services)
+        val selfPkgPercent = when {
+            selectedServices.size >= 4 -> 20
+            selectedServices.size == 3 -> 15
+            selectedServices.size == 2 -> 10
+            else -> 0
         }
-        val discount = if (matchedCoupon != null) {
-            ((subtotal * matchedCoupon.discountPercent) / 100).coerceAtMost(matchedCoupon.maxDiscountInr)
+        val selfPkgDiscountInr = (subtotal * selfPkgPercent) / 100
+        val afterSelfPkg = (subtotal - selfPkgDiscountInr).coerceAtLeast(0)
+
+        val matchedCoupon = _coupons.value.firstOrNull {
+            it.code.equals(couponCode.trim(), ignoreCase = true) && afterSelfPkg >= it.minOrderInr
+        }
+        val couponDiscount = if (matchedCoupon != null) {
+            ((afterSelfPkg * matchedCoupon.discountPercent) / 100).coerceAtMost(matchedCoupon.maxDiscountInr)
         } else {
             0
         }
-        val netTotal = (subtotal - discount).coerceAtLeast(0)
+        val totalDiscount = selfPkgDiscountInr + couponDiscount
+        val netTotal = (subtotal - totalDiscount).coerceAtLeast(0)
+
         val advancePayable = when (paymentType) {
             "FULL" -> netTotal
             "PAY_AT_VENUE" -> 0
-            else -> ((netTotal * 20) / 100).coerceAtLeast(if (netTotal > 0) 100.coerceAtMost(netTotal) else 0)
+            else -> ((netTotal * prechargeCustomPercent) / 100)
+                .coerceAtLeast(if (netTotal > 0) 100.coerceAtMost(netTotal) else 0)
         }
         val remaining = (netTotal - advancePayable).coerceAtLeast(0)
         val totalDuration = selectedServices.sumOf { it.durationMinutes + it.bufferMinutes }.coerceAtLeast(15)
         return BookingBreakdown(
             subtotalInr = subtotal,
-            discountInr = discount,
+            selfPackageDiscountPercent = selfPkgPercent,
+            selfPackageDiscountInr = selfPkgDiscountInr,
+            couponDiscountInr = couponDiscount,
+            discountInr = totalDiscount,
             netTotalInr = netTotal,
             advancePayableInr = advancePayable,
             remainingBalanceInr = remaining,
             totalDurationMinutes = totalDuration,
-            appliedCoupon = matchedCoupon?.code ?: "NONE"
+            appliedCoupon = matchedCoupon?.code ?: if (selfPkgPercent > 0) "SELF_PKG_${selfPkgPercent}" else "NONE"
         )
     }
 
@@ -322,7 +378,61 @@ class GroomlyViewModel(
         }
     }
 
-    // --- BOOKING & QUEUE ACTIONS ---
+    // --- BOOKING & SELF-CREATED PACKAGE ACTIONS ---
+    fun bookSelfCreatedCustomPackage(
+        providerId: String,
+        providerName: String,
+        serviceSummary: String,
+        durationMinutes: Int,
+        netTotalInr: Int,
+        prechargedAdvanceInr: Int,
+        remainingBalanceInr: Int,
+        paymentGateway: String
+    ) {
+        val mappedMethod = when (paymentGateway.uppercase()) {
+            "UPI" -> "UPI"
+            "RAZORPAY", "STRIPE_CARD", "CARD" -> "CARD"
+            "NET_BANKING" -> "NET_BANKING"
+            "WALLET" -> "WALLET"
+            else -> "UPI"
+        }
+        val mappedType = if (remainingBalanceInr == 0) "FULL" else "ADVANCE"
+
+        viewModelScope.launch {
+            repository.createAppointment(
+                providerId = providerId,
+                providerName = providerName,
+                vertical = "SALON",
+                serviceSummary = serviceSummary,
+                staffId = "staff_ahmed",
+                staffName = "Ahmed • Senior Barber",
+                dateIso = "2026-11-05",
+                timeSlot = "11:00 AM",
+                durationMinutes = durationMinutes,
+                totalAmountInr = netTotalInr,
+                advancePaidInr = prechargedAdvanceInr,
+                remainingBalanceInr = remainingBalanceInr,
+                paymentMethod = mappedMethod,
+                paymentType = mappedType,
+                couponCode = "SELF_CREATED_PKG",
+                isHomeService = false
+            ).onSuccess {
+                val receipt = PaymentAndWhatsAppService.buildGatewayAuthorizationReceipt(
+                    gateway = paymentGateway,
+                    amountInr = prechargedAdvanceInr,
+                    payerIdentifier = userDisplayName.ifBlank { "Customer" }
+                )
+                val waStatus = PaymentAndWhatsAppService.dispatchWhatsAppCloudMessage(
+                    recipientPhone = "+919845011223",
+                    messageBody = "Groomly Custom Package Confirmed at $providerName ($serviceSummary). Pre-charged ₹$prechargedAdvanceInr, Balance ₹$remainingBalanceInr."
+                )
+                appendWhatsAppLog(waStatus)
+                _statusBannerMessage.value =
+                    "✅ Custom Package Booked! $receipt • Balance at Salon: ₹$remainingBalanceInr"
+            }
+        }
+    }
+
     fun confirmSmartAppointment(
         provider: MarketplaceProvider,
         selectedServices: List<MarketplaceServiceItem>,
@@ -334,11 +444,20 @@ class GroomlyViewModel(
         couponCode: String,
         paymentMethod: String,
         paymentType: String,
+        prechargeCustomPercent: Int = 20,
         isHomeService: Boolean,
         onComplete: () -> Unit
     ) {
-        val breakdown = calculateBookingBreakdown(selectedServices, staffAddonInr, couponCode, paymentType)
-        val summary = selectedServices.joinToString(" + ") { it.name }.ifBlank { "Custom Service" }
+        val breakdown = calculateBookingBreakdown(
+            selectedServices = selectedServices,
+            staffAddonInr = staffAddonInr,
+            couponCode = couponCode,
+            paymentType = paymentType,
+            prechargeCustomPercent = prechargeCustomPercent
+        )
+        val prefix = if (selectedServices.size > 1) "Self-Created Package: " else ""
+        val summary = (prefix + selectedServices.joinToString(" + ") { it.name.substringBefore(" (") })
+            .ifBlank { "Custom Service" }
 
         viewModelScope.launch {
             val result = repository.createAppointment(
@@ -355,20 +474,35 @@ class GroomlyViewModel(
                 advancePaidInr = breakdown.advancePayableInr,
                 remainingBalanceInr = breakdown.remainingBalanceInr,
                 paymentMethod = paymentMethod,
-                paymentType = paymentType,
+                paymentType = if (paymentType == "HALF") "ADVANCE" else paymentType,
                 couponCode = breakdown.appliedCoupon,
                 isHomeService = isHomeService
             )
             result.onSuccess {
-                appendWhatsAppLog(
-                    "WhatsApp API [CONFIRMED] • ${provider.name} on $dateIso at $timeSlot ($summary). Paid ₹${breakdown.advancePayableInr}, Balance ₹${breakdown.remainingBalanceInr}."
+                val waLog = PaymentAndWhatsAppService.dispatchWhatsAppCloudMessage(
+                    recipientPhone = provider.contactPhone,
+                    messageBody = "${provider.name} on $dateIso at $timeSlot ($summary). Pre-Charged ₹${breakdown.advancePayableInr} ($paymentMethod), Balance ₹${breakdown.remainingBalanceInr}."
                 )
+                appendWhatsAppLog(waLog)
                 _statusBannerMessage.value =
-                    "Booking Confirmed! Paid ₹${breakdown.advancePayableInr} • Remaining Balance ₹${breakdown.remainingBalanceInr}"
+                    "Booking Confirmed! Pre-Charged ₹${breakdown.advancePayableInr} • Balance ₹${breakdown.remainingBalanceInr}"
                 onComplete()
             }.onFailure { e ->
                 _statusBannerMessage.value = e.localizedMessage ?: "Failed to confirm booking"
             }
+        }
+    }
+
+    fun dispatchWhatsAppAndOpenChat(
+        context: Context,
+        phone: String,
+        message: String
+    ) {
+        PaymentAndWhatsAppService.openWhatsAppDeepLink(context, phone, message)
+        viewModelScope.launch {
+            val logEntry = PaymentAndWhatsAppService.dispatchWhatsAppCloudMessage(phone, message)
+            appendWhatsAppLog(logEntry)
+            _statusBannerMessage.value = "WhatsApp Confirmation Dispatched!"
         }
     }
 
@@ -386,7 +520,7 @@ class GroomlyViewModel(
                 newStaffName = appointment.staffName
             ).onSuccess {
                 appendWhatsAppLog(
-                    "WhatsApp API [RESCHEDULED] • ${appointment.providerName} moved to $newDateIso at $newTimeSlot."
+                    "WhatsApp Cloud API [RESCHEDULED] • ${appointment.providerName} moved to $newDateIso at $newTimeSlot."
                 )
                 _statusBannerMessage.value = "Appointment rescheduled to $newDateIso at $newTimeSlot"
             }
@@ -404,7 +538,7 @@ class GroomlyViewModel(
                 remainingBalanceInr = newRemaining
             ).onSuccess {
                 appendWhatsAppLog(
-                    "WhatsApp API [STATUS: $newStatus] • ${appointment.providerName} (${appointment.serviceSummary})."
+                    "WhatsApp Cloud API [STATUS: $newStatus] • ${appointment.providerName} (${appointment.serviceSummary})."
                 )
                 _statusBannerMessage.value = "Appointment marked $newStatus"
             }
@@ -431,7 +565,7 @@ class GroomlyViewModel(
                 estimatedWaitMinutes = waitMins
             ).onSuccess {
                 appendWhatsAppLog(
-                    "WhatsApp API [QUEUE TICKET #$nextNum] • Joined ${provider.name} live queue. Est. wait ~$waitMins mins (non-guaranteed)."
+                    "WhatsApp Cloud API [QUEUE TICKET #$nextNum] • Joined ${provider.name} live queue. Est. wait ~$waitMins mins (non-guaranteed)."
                 )
                 _statusBannerMessage.value = "Joined Live Queue! Digital Token #$nextNum issued."
             }
@@ -467,7 +601,7 @@ class GroomlyViewModel(
                 newStatus = nextStatus
             ).onSuccess {
                 appendWhatsAppLog(
-                    "WhatsApp API [QUEUE UPDATE] • Token #${ticket.queueNumber} at ${ticket.providerName} is now $nextStatus."
+                    "WhatsApp Cloud API [QUEUE UPDATE] • Token #${ticket.queueNumber} at ${ticket.providerName} is now $nextStatus."
                 )
                 _statusBannerMessage.value = "Queue Token #${ticket.queueNumber} -> $nextStatus"
             }
@@ -526,8 +660,6 @@ class GroomlyViewModel(
             ).onSuccess {
                 if (addWalletInr > 0) {
                     _statusBannerMessage.value = "Added ₹$addWalletInr to Groomly Wallet (+25 Loyalty Pts)"
-                } else {
-                    _statusBannerMessage.value = "Profile & notification preferences saved"
                 }
             }
         }

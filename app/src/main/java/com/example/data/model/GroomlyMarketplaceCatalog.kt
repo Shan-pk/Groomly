@@ -1,6 +1,31 @@
 package com.example.data.model
 
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.math.sqrt
+
 object GroomlyMarketplaceCatalog {
+
+    val locationHubs: List<LocationHub> = listOf(
+        LocationHub("hub_blr", "Indiranagar, Bengaluru", "India", 12.9784, 77.6408),
+        LocationHub("hub_bom", "Bandra West, Mumbai", "India", 19.0596, 72.8295),
+        LocationHub("hub_dxb", "Downtown Boulevard, Dubai", "UAE", 25.1972, 55.2744),
+        LocationHub("hub_lon", "Soho & Mayfair, London", "UK", 51.5136, -0.1365)
+    )
+
+    fun calculateHaversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val r = 6371.0
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = sin(dLat / 2) * sin(dLat / 2) +
+            cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
+            sin(dLon / 2) * sin(dLon / 2)
+        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+        val raw = r * c
+        return ((raw * 10.0).roundToInt() / 10.0).coerceAtLeast(0.3)
+    }
 
     val initialCategories: List<ServiceCategoryItem> = listOf(
         ServiceCategoryItem("cat_1", "Men's Haircut", "SALON", "MENS", 299),
@@ -23,7 +48,8 @@ object GroomlyMarketplaceCatalog {
 
     val coupons: List<CouponItem> = listOf(
         CouponItem("GROOM100", "Flat ₹100 OFF on Men's & Unisex Salons", 15, 100, 400, "SALON"),
-        CouponItem("LIME20", "20% OFF Gen-Z First Booking Special (Up to ₹250)", 20, 250, 500, "ALL"),
+        CouponItem("LIME20", "20% OFF International MNC Launch Offer (Up to ₹250)", 20, 250, 500, "ALL"),
+        CouponItem("BYOP18", "Extra 18% OFF Self-Created Custom Haircut Packages", 18, 400, 600, "SALON"),
         CouponItem("BRIDALGLOW", "₹1,000 OFF Bridal & Groom Pre-Wedding Packages", 15, 1000, 3500, "BRIDAL"),
         CouponItem("CLINIC15", "15% OFF Verified Dermatology & Diet Consultations", 15, 400, 1000, "MEDICAL")
     )
@@ -32,21 +58,23 @@ object GroomlyMarketplaceCatalog {
         MarketplaceProvider(
             id = "prov_royal_gents",
             name = "Royal Gents Salon",
-            tagline = "Precision Fades • Hot Towel Shaves • Grooming Lounge",
-            description = "Flagship men's luxury barbershop and grooming studio in Indiranagar. Specializing in zero skin fades, straight-razor beard architecture, detan charcoal facials, and groom makeovers.",
+            tagline = "Precision Fades • Self-Created Haircut Packages • Groom Lounge",
+            description = "International flagship men's luxury barbershop and grooming studio. Come for a signature haircut and build your own custom pre-charged package with beard sculpting, charcoal detox facial, hair spa, or head massage.",
             vertical = "SALON",
             genderFocus = "MENS",
             address = "100 Feet Road, HAL 2nd Stage, Indiranagar, Bengaluru",
-            distanceKm = 1.2,
-            rating = 4.9,
+            distanceKm = 0.8,
+            latitude = 12.9789,
+            longitude = 77.6414,
+            rating = 4.95,
             reviewCount = 428,
             openingHours = "09:00 AM - 09:30 PM",
-            contactPhone = "+91 98450 11223",
+            contactPhone = "+919845011223",
             isVerified = true,
             isOpenNow = true,
             isAvailableToday = true,
             homeServiceAvailable = true,
-            cancellationPolicy = "Free cancellation up to 2 hours before slot. 100% advance refund to wallet or source.",
+            cancellationPolicy = "Free cancellation up to 2 hours before slot. 100% pre-charged advance refund to UPI or Wallet.",
             liveQueueCurrentServing = 11,
             liveQueueNextToken = 14,
             estimatedWaitPerPersonMin = 8,
@@ -57,7 +85,7 @@ object GroomlyMarketplaceCatalog {
                     name = "Ahmed",
                     roleTitle = "Senior Barber",
                     specialty = "Zero Skin Fade & Scissor Crop",
-                    rating = 4.95,
+                    rating = 4.96,
                     completedJobs = 1840,
                     experienceYears = 9,
                     priceAddonInr = 50,
@@ -71,7 +99,7 @@ object GroomlyMarketplaceCatalog {
                     name = "Rahul",
                     roleTitle = "Hair Stylist",
                     specialty = "Korean Perm, Color & Keratin",
-                    rating = 4.88,
+                    rating = 4.89,
                     completedJobs = 1120,
                     experienceYears = 6,
                     priceAddonInr = 0,
@@ -85,7 +113,7 @@ object GroomlyMarketplaceCatalog {
                     name = "Sameer",
                     roleTitle = "Beard Specialist",
                     specialty = "Hot Towel Razor Sculpt & Facial",
-                    rating = 4.92,
+                    rating = 4.93,
                     completedJobs = 1490,
                     experienceYears = 7,
                     priceAddonInr = 0,
@@ -97,10 +125,70 @@ object GroomlyMarketplaceCatalog {
             ),
             services = listOf(
                 MarketplaceServiceItem(
-                    id = "srv_rg_pkg",
-                    name = "Premium Grooming Package",
+                    id = "srv_rg_cut",
+                    name = "Executive Skin Fade & Wash (Base Haircut)",
                     categoryName = "Men's Haircut",
-                    description = "Complete bundle: Precision Haircut + Beard Trim & Razor Lineup + Charcoal Glow Facial + Relaxing Hair Wash.",
+                    description = "Tailored fade or scissor cut with invigorating scalp wash and matte clay styling.",
+                    durationMinutes = 35,
+                    bufferMinutes = 5,
+                    priceInr = 400,
+                    discountPriceInr = 350,
+                    genderEligibility = "MENS",
+                    homeServiceAvailable = true
+                ),
+                MarketplaceServiceItem(
+                    id = "srv_rg_beard",
+                    name = "Hot Towel Beard Sculpt & Razor Lineup",
+                    categoryName = "Beard Grooming",
+                    description = "Aromatic steam towel ritual, straight-razor cheek & neck outline, and organic beard oil.",
+                    durationMinutes = 20,
+                    bufferMinutes = 5,
+                    priceInr = 250,
+                    discountPriceInr = 200,
+                    genderEligibility = "MENS",
+                    homeServiceAvailable = true
+                ),
+                MarketplaceServiceItem(
+                    id = "srv_rg_facial",
+                    name = "O3+ Activated Charcoal Detan Facial",
+                    categoryName = "Facial",
+                    description = "Deep pore blackhead extraction, glycolic peel, and cooling charcoal hydro-mask.",
+                    durationMinutes = 35,
+                    bufferMinutes = 5,
+                    priceInr = 650,
+                    discountPriceInr = 450,
+                    genderEligibility = "MENS",
+                    homeServiceAvailable = true
+                ),
+                MarketplaceServiceItem(
+                    id = "srv_rg_spa",
+                    name = "Moroccanoil Anti-Dandruff Hair Spa & Massage",
+                    categoryName = "Hair Spa",
+                    description = "Warm argan oil steam infusion with 15-minute acupressure head, neck & shoulder massage.",
+                    durationMinutes = 30,
+                    bufferMinutes = 5,
+                    priceInr = 550,
+                    discountPriceInr = 399,
+                    genderEligibility = "MENS",
+                    homeServiceAvailable = true
+                ),
+                MarketplaceServiceItem(
+                    id = "srv_rg_cleanup",
+                    name = "Express Vitamin-C Face Cleanup & Under-Eye Detox",
+                    categoryName = "Cleanup",
+                    description = "15-minute instant brightness scrub, steam cleanup, and ice-globe under-eye depuffing.",
+                    durationMinutes = 20,
+                    bufferMinutes = 5,
+                    priceInr = 350,
+                    discountPriceInr = 250,
+                    genderEligibility = "MENS",
+                    homeServiceAvailable = true
+                ),
+                MarketplaceServiceItem(
+                    id = "srv_rg_pkg",
+                    name = "Ready-Made Premium Grooming Package",
+                    categoryName = "Men's Haircut",
+                    description = "Pre-curated bundle: Precision Haircut + Beard Trim + Charcoal Glow Facial + Hair Wash.",
                     durationMinutes = 75,
                     bufferMinutes = 10,
                     priceInr = 750,
@@ -111,32 +199,8 @@ object GroomlyMarketplaceCatalog {
                     bundleIncludedItems = listOf("Haircut", "Beard trim", "Facial", "Hair wash")
                 ),
                 MarketplaceServiceItem(
-                    id = "srv_rg_cut",
-                    name = "Executive Skin Fade & Wash",
-                    categoryName = "Men's Haircut",
-                    description = "Tailored fade or scissor cut with invigorating scalp massage and styling.",
-                    durationMinutes = 35,
-                    bufferMinutes = 5,
-                    priceInr = 400,
-                    discountPriceInr = 350,
-                    genderEligibility = "MENS",
-                    homeServiceAvailable = true
-                ),
-                MarketplaceServiceItem(
-                    id = "srv_rg_beard",
-                    name = "Hot Towel Beard Sculpt",
-                    categoryName = "Beard Grooming",
-                    description = "Aromatic steam towel ritual, straight-razor cheek & neck outline, and beard oil finish.",
-                    durationMinutes = 25,
-                    bufferMinutes = 5,
-                    priceInr = 250,
-                    discountPriceInr = 200,
-                    genderEligibility = "MENS",
-                    homeServiceAvailable = true
-                ),
-                MarketplaceServiceItem(
                     id = "srv_rg_groom",
-                    name = "Royal Groom Wedding Prep",
+                    name = "Royal Groom Wedding Prep Suite",
                     categoryName = "Groom Makeup",
                     description = "HD natural airbrush groom makeup, O3+ bridal glow facial, haircut, and beard styling.",
                     durationMinutes = 120,
@@ -149,21 +213,26 @@ object GroomlyMarketplaceCatalog {
                     bundleIncludedItems = listOf("O3+ Bridal Facial", "HD Airbrush Groom Makeup", "Signature Hair & Beard")
                 )
             ),
-            offers = listOf("Use GROOM100 for ₹100 OFF", "20% Advance Payment Booking Protection")
+            offers = listOf(
+                "Self-Created Package: Combine Haircut + 2 Add-Ons for automatic 15% OFF",
+                "Use GROOM100 for ₹100 OFF • UPI & Razorpay Instant Pre-Charge"
+            )
         ),
         MarketplaceProvider(
             id = "prov_velvet_bridal",
             name = "Maison Velvet Beauty & Bridal",
-            tagline = "Luxury Women's Parlour • Couture Bridal & Skin Atelier",
-            description = "Editorial women's beauty parlour and celebrity bridal studio. Known for glass-skin facials, French balayage, Russian gel manicures, and HD airbrush bridal transformations.",
+            tagline = "Luxury Women's Parlour • Couture Bridal & Custom Packages",
+            description = "Editorial women's beauty parlour and celebrity bridal studio. Build your own custom haircut + facial + manicure/pedicure package with pre-charged priority booking.",
             vertical = "BRIDAL",
             genderFocus = "WOMENS",
             address = "Lavelle Road, Luxury Quarter, Bengaluru",
-            distanceKm = 2.4,
+            distanceKm = 2.1,
+            latitude = 12.9719,
+            longitude = 77.5993,
             rating = 4.94,
             reviewCount = 615,
             openingHours = "09:30 AM - 08:30 PM",
-            contactPhone = "+91 98450 44556",
+            contactPhone = "+919845044556",
             isVerified = true,
             isOpenNow = true,
             isAvailableToday = true,
@@ -186,7 +255,7 @@ object GroomlyMarketplaceCatalog {
                     shiftHours = "09:30 AM - 07:30 PM",
                     breakWindow = "02:00 PM - 02:45 PM",
                     isAvailableToday = true,
-                    portfolioHighlights = listOf("Sabyasachi Editorial Bridal", "Soft Glam Cocktail Look", "South Indian Muhurtham Draping")
+                    portfolioHighlights = listOf("Sabyasachi Editorial Bridal", "Soft Glam Cocktail Look", "Muhurtham Draping")
                 ),
                 StaffMemberProfile(
                     id = "staff_meera",
@@ -220,7 +289,7 @@ object GroomlyMarketplaceCatalog {
             services = listOf(
                 MarketplaceServiceItem(
                     id = "srv_mv_cut",
-                    name = "Couture Women's Haircut & Blowdry",
+                    name = "Couture Women's Haircut & Blowdry (Base Cut)",
                     categoryName = "Women's Haircut",
                     description = "Consultation, keratin-infused wash, precision butterfly/layer cut, and bouncy salon blowout.",
                     durationMinutes = 50,
@@ -235,10 +304,22 @@ object GroomlyMarketplaceCatalog {
                     name = "24K Gold & Hyaluronic Glass Facial",
                     categoryName = "Facial",
                     description = "7-step ultrasonic pore cleanup, enzymatic peel, and illuminating hydro-jelly mask.",
-                    durationMinutes = 60,
+                    durationMinutes = 55,
                     bufferMinutes = 10,
                     priceInr = 1600,
                     discountPriceInr = 1199,
+                    genderEligibility = "WOMENS",
+                    homeServiceAvailable = true
+                ),
+                MarketplaceServiceItem(
+                    id = "srv_mv_wax",
+                    name = "Rica White Chocolate Full Arms & Legs Waxing",
+                    categoryName = "Waxing",
+                    description = "Gentle colophony-free Italian Rica wax with soothing post-wax rose oil.",
+                    durationMinutes = 40,
+                    bufferMinutes = 5,
+                    priceInr = 850,
+                    discountPriceInr = 599,
                     genderEligibility = "WOMENS",
                     homeServiceAvailable = true
                 ),
@@ -271,21 +352,23 @@ object GroomlyMarketplaceCatalog {
                     bundleIncludedItems = listOf("HD Airbrush Makeup", "Bridal Hairdo & Florals", "Saree/Lehenga Draping", "Lashes & Lenses")
                 )
             ),
-            offers = listOf("Use BRIDALGLOW for ₹1,000 OFF Bridal Packages", "Free Home Service on orders above ₹1,499")
+            offers = listOf("Use BRIDALGLOW for ₹1,000 OFF Bridal Packages", "Self-Created Package: Up to 20% OFF Multi-Service Combos")
         ),
         MarketplaceProvider(
             id = "prov_monochrome_unisex",
             name = "MONOCHROME Unisex Studio",
-            tagline = "Gen-Z Hair Lab • Color Bar • Express Grooming",
-            description = "Minimalist unisex salon crafted for Gen-Z trendsetters. Vivid hair colouring, wolf cuts, brow threading, express cleanups, and live walk-in digital queue.",
+            tagline = "Gen-Z Hair Lab • Color Bar • Custom Pre-Charged Combos",
+            description = "Minimalist international unisex salon crafted for Gen-Z trendsetters. Mix & match haircuts, ammonia-free hair color, brow threading, and Vitamin-C cleanups.",
             vertical = "SALON",
             genderFocus = "UNISEX",
             address = "Koramangala 4th Block, Bengaluru",
             distanceKm = 2.9,
-            rating = 4.86,
+            latitude = 12.9352,
+            longitude = 77.6245,
+            rating = 4.88,
             reviewCount = 342,
             openingHours = "10:00 AM - 10:00 PM",
-            contactPhone = "+91 98450 77889",
+            contactPhone = "+919845077889",
             isVerified = true,
             isOpenNow = true,
             isAvailableToday = true,
@@ -328,7 +411,7 @@ object GroomlyMarketplaceCatalog {
             services = listOf(
                 MarketplaceServiceItem(
                     id = "srv_mc_style",
-                    name = "Unisex Restyle Cut & Blowout",
+                    name = "Unisex Restyle Cut & Blowout (Base Cut)",
                     categoryName = "Hair Styling",
                     description = "Gender-neutral restyle haircut with wash, scalp detox, and texture styling.",
                     durationMinutes = 45,
@@ -361,6 +444,18 @@ object GroomlyMarketplaceCatalog {
                     discountPriceInr = 499,
                     genderEligibility = "UNISEX",
                     homeServiceAvailable = false
+                ),
+                MarketplaceServiceItem(
+                    id = "srv_mc_pedi",
+                    name = "Detox Matcha Spa Pedicure",
+                    categoryName = "Pedicure",
+                    description = "Green tea soak, callus smoothing, and lower-leg lymphatic massage.",
+                    durationMinutes = 40,
+                    bufferMinutes = 5,
+                    priceInr = 750,
+                    discountPriceInr = 549,
+                    genderEligibility = "UNISEX",
+                    homeServiceAvailable = false
                 )
             ),
             offers = listOf("Use LIME20 for 20% OFF", "Live Queue Express Walk-In Enabled")
@@ -374,10 +469,12 @@ object GroomlyMarketplaceCatalog {
             genderFocus = "UNISEX",
             address = "UB City Medical Suites, Vittal Mallya Road, Bengaluru",
             distanceKm = 3.1,
+            latitude = 12.9716,
+            longitude = 77.5961,
             rating = 4.97,
             reviewCount = 289,
             openingHours = "10:00 AM - 07:30 PM",
-            contactPhone = "+91 80 4112 9900",
+            contactPhone = "+918041129900",
             isVerified = true,
             isOpenNow = true,
             isAvailableToday = true,
@@ -441,10 +538,12 @@ object GroomlyMarketplaceCatalog {
             genderFocus = "UNISEX",
             address = "HSR Layout Sector 2 & Online Tele-Consult, Bengaluru",
             distanceKm = 4.0,
+            latitude = 12.9121,
+            longitude = 77.6446,
             rating = 4.93,
             reviewCount = 198,
             openingHours = "08:30 AM - 08:00 PM",
-            contactPhone = "+91 98450 99001",
+            contactPhone = "+919845099001",
             isVerified = true,
             isOpenNow = true,
             isAvailableToday = true,
@@ -476,7 +575,7 @@ object GroomlyMarketplaceCatalog {
                     id = "srv_nd_consult",
                     name = "1-on-1 Clinical Nutrition & Body Composition Assessment",
                     categoryName = "Diet & Wellness",
-                    description = "45-minute metabolic profiling, blood-work review, and personalized Indian meal plan.",
+                    description = "45-minute metabolic profiling, blood-work review, and personalized meal plan.",
                     durationMinutes = 45,
                     bufferMinutes = 10,
                     priceInr = 1200,
@@ -496,7 +595,7 @@ object GroomlyMarketplaceCatalog {
                     genderEligibility = "UNISEX",
                     homeServiceAvailable = true,
                     isBundle = true,
-                    bundleIncludedItems = listOf("4 Weekly Consultations", "Custom Indian Macros Plan", "Skin & Hair Micronutrient Guide")
+                    bundleIncludedItems = listOf("4 Weekly Consultations", "Custom Macros Plan", "Skin & Hair Micronutrient Guide")
                 )
             ),
             offers = listOf("Use CLINIC15 for 15% OFF", "Online & Clinic Consultations Available")
@@ -512,13 +611,13 @@ object GroomlyMarketplaceCatalog {
     val architectureDeliverables: List<ArchitectureDeliverable> = listOf(
         ArchitectureDeliverable(
             number = 1,
-            title = "Multi-Vendor Ecosystem & Universal Provider Architecture",
-            category = "System Architecture",
-            summary = "3-Tier connected ecosystem (Customer App, Provider Studio + Web SaaS, Super Admin Control Plane) supporting Salons, Barbers, Bridal Studios, Dietitians, and Dermatology Clinics.",
+            title = "International MNC HTML5 + Jetpack Compose Hybrid Experience",
+            category = "UI/UX & Hybrid Architecture",
+            summary = "Animated HTML5/CSS3/JS Main Page connected via bidirectional @JavascriptInterface bridge to native Jetpack Compose, Cloud Firestore, GPS LocationManager, UPI Deep-Links, and WhatsApp.",
             keyHighlights = listOf(
-                "Universal Vertical Engine: SALON, BRIDAL, DIETITIAN, DERMATOLOGY with vertical-specific compliance badges",
-                "Real-time Cloud Firestore synchronization with per-user zero-trust security rules",
-                "Role-switcher header allowing instant inspection of Customer, Provider, Admin, and Architecture views"
+                "Interactive Self-Created Custom Package Builder (Haircut + dynamic shop add-ons with automatic tier discounts)",
+                "Real-time Haversine GPS distance calculation & nearest salon radar sorting",
+                "Dual-mode Payment Gateway (Android UPI Intent + Razorpay/Stripe Multi-Gateway Checkout)"
             )
         ),
         ArchitectureDeliverable(
@@ -528,8 +627,8 @@ object GroomlyMarketplaceCatalog {
             summary = "10-step frictionless booking pipeline calculating dynamic slot availability from service duration, buffer time, staff shift schedules, breaks, and existing appointments.",
             keyHighlights = listOf(
                 "Automatic double-booking prevention: booked (providerId + staffId + dateIso + timeSlot) combinations are locked in real time",
-                "Supports multi-service bundles (e.g., Premium Grooming Package) with automatic duration & discount aggregation",
-                "India-first payment breakdown: Service Price ₹500 -> Advance ₹100 (20%) -> Balance at Shop ₹400"
+                "Self-Created Packaging (BYOP): Customers coming for a haircut can add any shop service and pre-charge 20%, 50%, or 100%",
+                "India-first & Global payment breakdown: Service Price -> Pre-Charged Advance -> Remaining Balance at Shop"
             )
         ),
         ArchitectureDeliverable(
@@ -549,9 +648,9 @@ object GroomlyMarketplaceCatalog {
             category = "Database Engineering",
             summary = "Complete relational entity map covering Users, Roles, Providers, Locations (PostGIS), Staff, Schedules, Bundles, Appointments, Queue Tickets, Payments, Settlements, and Audit Logs.",
             keyHighlights = listOf(
-                "Zero-Trust ABAC Security Rules verified via 7 Node.js rules tests and 4 Robolectric JVM emulator tests",
+                "Zero-Trust ABAC Security Rules verified and deployed to Cloud Firestore",
                 "Strict tenant isolation (`resource.data.userId == request.auth.uid`) and terminal state locking",
-                "Configurable platform commission (5%-40%), provider SaaS subscriptions, and WhatsApp Business notification logs"
+                "Configurable platform commission (5%-40%), provider SaaS subscriptions, and WhatsApp Business Cloud API dispatch"
             )
         )
     )

@@ -1,5 +1,11 @@
 package com.example.ui.screens
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,20 +27,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -64,9 +68,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.data.integration.PaymentAndWhatsAppService
 import com.example.data.model.Appointment
 import com.example.data.model.GroomlyMarketplaceCatalog
 import com.example.data.model.MarketplaceProvider
@@ -74,10 +80,8 @@ import com.example.data.model.QueueTicket
 import com.example.data.model.Review
 import com.example.data.model.UserProfile
 import com.example.ui.theme.GroomlyElectricLime
-import com.example.ui.theme.GroomlyMedicalCyan
 import com.example.ui.theme.GroomlyObsidian
 import com.example.ui.theme.GroomlySuccessMint
-import com.example.ui.theme.GroomlyVibrantViolet
 import com.example.ui.theme.GroomlyWarmIvory
 import com.example.ui.viewmodel.GroomlyViewModel
 import com.example.ui.viewmodel.UiState
@@ -87,8 +91,10 @@ fun CustomerEcosystemScreen(
     viewModel: GroomlyViewModel,
     onSignOut: () -> Unit
 ) {
+    val context = LocalContext.current
     val tabIndex by viewModel.customerTabIndex.collectAsState()
     val selectedProvider by viewModel.selectedProviderForDetail.collectAsState()
+    val isHtmlMainPage by viewModel.isHtmlMainPageEnabled.collectAsState()
 
     val profileState by viewModel.userProfileState.collectAsState()
     val appointmentsState by viewModel.appointmentsState.collectAsState()
@@ -101,6 +107,30 @@ fun CustomerEcosystemScreen(
     val reviews = (reviewsState as? UiState.Success)?.data.orEmpty()
 
     var activeQueueModalTicket by remember { mutableStateOf<QueueTicket?>(null) }
+    var htmlGatewayPending by remember {
+        mutableStateOf< Quadruple<Int, String, String, () -> Unit>?>(null)
+    }
+
+    htmlGatewayPending?.let { (amt, gw, desc, onConfirm) ->
+        MultiGatewayPaymentDialog(
+            amountInr = amt,
+            initialGateway = gw,
+            serviceDescription = desc,
+            onDismiss = { htmlGatewayPending = null },
+            onLaunchUpiApp = {
+                PaymentAndWhatsAppService.launchUpiPaymentIntent(
+                    context = context,
+                    amountInr = amt,
+                    merchantName = "Groomly Marketplace",
+                    transactionNote = desc
+                )
+            },
+            onPaymentAuthorized = {
+                htmlGatewayPending = null
+                onConfirm()
+            }
+        )
+    }
 
     activeQueueModalTicket?.let { ticket ->
         LiveQueueQrDialog(
@@ -135,13 +165,62 @@ fun CustomerEcosystemScreen(
     }
 
     when (tabIndex) {
-        0 -> CustomerHomeTab(
-            profile = profile,
-            appointments = appointments,
-            queueTickets = queueTickets,
-            viewModel = viewModel,
-            onOpenQueueQr = { activeQueueModalTicket = it }
-        )
+        0 -> {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Mode Switcher Bar between International HTML5 Main Page & Native Compose View
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Code,
+                            contentDescription = "Main Page Mode",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isHtmlMainPage) {
+                                "HTML5 Animated MNC Main Page Active"
+                            } else {
+                                "Native Compose Main Page Active"
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    TextButton(
+                        onClick = { viewModel.toggleHtmlMainPage() },
+                        modifier = Modifier.testTag("toggle_html_native_main_button")
+                    ) {
+                        Text(if (isHtmlMainPage) "Switch to Native UI" else "Switch to HTML5 Main")
+                    }
+                }
+
+                if (isHtmlMainPage) {
+                    HtmlMainPageScreen(
+                        viewModel = viewModel,
+                        onOpenGatewayModal = { amt, gw, desc, onConfirm ->
+                            htmlGatewayPending = Quadruple(amt, gw, desc, onConfirm)
+                        }
+                    )
+                } else {
+                    CustomerHomeTab(
+                        profile = profile,
+                        appointments = appointments,
+                        queueTickets = queueTickets,
+                        viewModel = viewModel,
+                        onOpenQueueQr = { activeQueueModalTicket = it }
+                    )
+                }
+            }
+        }
         1 -> CustomerExploreTab(
             profile = profile,
             viewModel = viewModel
@@ -165,6 +244,8 @@ fun CustomerEcosystemScreen(
     }
 }
 
+private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CustomerHomeTab(
@@ -174,8 +255,30 @@ private fun CustomerHomeTab(
     viewModel: GroomlyViewModel,
     onOpenQueueQr: (QueueTicket) -> Unit
 ) {
+    val context = LocalContext.current
     val categories by viewModel.categories.collectAsState()
     val coupons by viewModel.coupons.collectAsState()
+    val activeLocLabel by viewModel.activeLocationLabel.collectAsState()
+    val userLat by viewModel.userLatitude.collectAsState()
+    val userLng by viewModel.userLongitude.collectAsState()
+
+    val sortedProviders = remember(userLat, userLng) {
+        viewModel.getLocationSortedProviders()
+    }
+
+    val gpsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { perms ->
+        val granted = perms[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            perms[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        val coords = if (granted) {
+            PaymentAndWhatsAppService.fetchDeviceGpsCoordinates(context) ?: (12.9784 to 77.6408)
+        } else {
+            12.9784 to 77.6408
+        }
+        viewModel.updateActiveGpsCoordinates("Live GPS • Bengaluru", coords.first, coords.second)
+    }
+
     val activeQueue = queueTickets.firstOrNull { it.status !in listOf("COMPLETED", "CANCELLED") }
     val upcomingAppts = appointments.filter { it.status in listOf("CONFIRMED", "RESCHEDULED", "ARRIVED", "IN_PROGRESS") }
 
@@ -184,43 +287,75 @@ private fun CustomerHomeTab(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Location & Search Bar Header
+        // Location-Based Booking System Radar Bar
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = "Location",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Column {
-                        Text(
-                            text = "CURRENT LOCATION",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = profile.cityLocation,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "₹${profile.walletBalanceInr} • ${profile.loyaltyPoints} Pts",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = "Location",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Column {
+                                Text(
+                                    text = "LOCATION-BASED BOOKING RADAR",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = activeLocLabel,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                gpsPermissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                    )
+                                )
+                            },
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.GpsFixed, contentDescription = "GPS", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("GPS")
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        GroomlyMarketplaceCatalog.locationHubs.forEach { hub ->
+                            FilterChip(
+                                selected = activeLocLabel.contains(hub.name.substringBefore(",")),
+                                onClick = {
+                                    viewModel.updateActiveGpsCoordinates(hub.name, hub.latitude, hub.longitude)
+                                },
+                                label = { Text("${hub.name} (${hub.country})") }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -242,7 +377,7 @@ private fun CustomerHomeTab(
                     Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "What service are you looking for? (Haircut, Bridal, Derma...)",
+                        text = "What service are you looking for? (Haircut, Custom Package, Bridal...)",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -250,7 +385,7 @@ private fun CustomerHomeTab(
             }
         }
 
-        // Gen-Z Promotional Editorial Hero Banner
+        // Hero Banner for Self-Created Haircut Packaging
         item {
             Card(
                 shape = RoundedCornerShape(24.dp),
@@ -272,7 +407,7 @@ private fun CustomerHomeTab(
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
-                                text = "GEN-Z MULTI-VENDOR DROP • CODE: LIME20",
+                                text = "SELF-CREATED PACKAGING • UP TO 20% OFF",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = GroomlyObsidian,
                                 fontWeight = FontWeight.Bold,
@@ -280,20 +415,20 @@ private fun CustomerHomeTab(
                             )
                         }
                         Text(
-                            text = "Zero-Wait Grooming, Couture Bridal & Clinical Skin Care.",
+                            text = "Come for a Haircut. Add Any Shop Services & Pre-Charge Your Way.",
                             style = MaterialTheme.typography.headlineMedium,
                             color = GroomlyWarmIvory,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Lock your slot with 20% UPI Advance (e.g. ₹100 now, ₹400 at salon) or join a real-time digital walk-in queue.",
+                            text = "Build your own custom package (Haircut + Beard + Facial + Spa), pre-charge 20%, 50%, or 100% via UPI/Razorpay, and receive instant WhatsApp confirmation.",
                             style = MaterialTheme.typography.bodySmall,
                             color = GroomlyWarmIvory.copy(alpha = 0.8f)
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Button(
                                 onClick = {
-                                    viewModel.selectProviderForDetail(GroomlyMarketplaceCatalog.providers.first())
+                                    viewModel.selectProviderForDetail(sortedProviders.first())
                                 },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = GroomlyElectricLime,
@@ -301,13 +436,13 @@ private fun CustomerHomeTab(
                                 ),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Text("Book Royal Gents", fontWeight = FontWeight.Bold)
+                                Text("Build Custom Package", fontWeight = FontWeight.Bold)
                             }
                             OutlinedButton(
                                 onClick = { viewModel.setCustomerTab(1) },
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Text("Explore Map", color = GroomlyWarmIvory)
+                                Text("Radar Map", color = GroomlyWarmIvory)
                             }
                         }
                     }
@@ -315,7 +450,6 @@ private fun CustomerHomeTab(
             }
         }
 
-        // Live Queue Ticket Active Widget
         if (activeQueue != null) {
             item {
                 Card(
@@ -363,7 +497,6 @@ private fun CustomerHomeTab(
             }
         }
 
-        // Upcoming Appointment Quick Card
         if (upcomingAppts.isNotEmpty()) {
             val nextAppt = upcomingAppts.first()
             item {
@@ -397,7 +530,7 @@ private fun CustomerHomeTab(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Specialist: ${nextAppt.staffName} • Paid ₹${nextAppt.advancePaidInr} | Balance ₹${nextAppt.remainingBalanceInr}",
+                            text = "Specialist: ${nextAppt.staffName} • Pre-Charged ₹${nextAppt.advancePaidInr} | Balance ₹${nextAppt.remainingBalanceInr}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -447,7 +580,7 @@ private fun CustomerHomeTab(
         // Exclusive Coupons Row
         item {
             Text(
-                text = "Exclusive Offers & Coupons",
+                text = "Exclusive Offers & Custom Package Coupons",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -471,10 +604,7 @@ private fun CustomerHomeTab(
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold
                             )
-                            Text(
-                                text = coupon.title,
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                            Text(text = coupon.title, style = MaterialTheme.typography.bodySmall)
                             Text(
                                 text = "Min order ₹${coupon.minOrderInr} • Save up to ₹${coupon.maxDiscountInr}",
                                 style = MaterialTheme.typography.labelMedium,
@@ -486,16 +616,16 @@ private fun CustomerHomeTab(
             }
         }
 
-        // Featured Multi-Vendor Providers
+        // Location-Sorted Multi-Vendor Providers
         item {
             Text(
-                text = "Nearby Salons, Barbers, Bridal & Clinics",
+                text = "Nearest Salons, Barbers, Bridal & Clinics (GPS Sorted)",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
         }
 
-        items(GroomlyMarketplaceCatalog.providers, key = { it.id }) { provider ->
+        items(sortedProviders, key = { it.id }) { provider ->
             ProviderMarketplaceCard(
                 provider = provider,
                 isFavourite = profile.favouriteProviderIds.contains(provider.id),
@@ -525,8 +655,14 @@ private fun CustomerExploreTab(
     val onlyHomeService by viewModel.onlyHomeService.collectAsState()
     val onlyAvailableToday by viewModel.onlyAvailableToday.collectAsState()
     val isMapMode by viewModel.isMapMode.collectAsState()
+    val userLat by viewModel.userLatitude.collectAsState()
+    val userLng by viewModel.userLongitude.collectAsState()
 
-    val filteredProviders = GroomlyMarketplaceCatalog.providers.filter { p ->
+    val locationSorted = remember(userLat, userLng) {
+        viewModel.getLocationSortedProviders()
+    }
+
+    val filteredProviders = locationSorted.filter { p ->
         val matchesQuery = searchQuery.isBlank() ||
             p.name.contains(searchQuery, ignoreCase = true) ||
             p.tagline.contains(searchQuery, ignoreCase = true) ||
@@ -551,7 +687,7 @@ private fun CustomerExploreTab(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Explore & Advanced Discovery",
+                    text = "Location-Based Discovery",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -571,7 +707,7 @@ private fun CustomerExploreTab(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { viewModel.setSearchQuery(it) },
-                label = { Text("Search salon, barber (Ahmed), service, or clinic...") },
+                label = { Text("Search salon, barber (Ahmed), custom package, or clinic...") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
                 singleLine = true,
                 modifier = Modifier
@@ -651,7 +787,7 @@ private fun InteractiveProvidersMapCard(
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(
-                text = "POSTGIS LIVE RADAR MAP • BENGALURU CLUSTER (${providers.size} active pins)",
+                text = "POSTGIS LIVE RADAR MAP • HAVERSINE GPS SORTED (${providers.size} active pins)",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold
@@ -665,7 +801,6 @@ private fun InteractiveProvidersMapCard(
                     .background(Color(0xFF10141D))
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    // Subtle grid lines
                     val step = size.width / 6f
                     for (i in 1..5) {
                         drawLine(
@@ -675,13 +810,11 @@ private fun InteractiveProvidersMapCard(
                             strokeWidth = 1.5f
                         )
                     }
-                    // Draw radar circles
                     drawCircle(
                         color = GroomlyElectricLime.copy(alpha = 0.12f),
                         radius = size.minDimension * 0.42f,
                         center = Offset(size.width * 0.5f, size.height * 0.5f)
                     )
-                    // Pins
                     val offsets = listOf(
                         Offset(0.28f, 0.35f),
                         Offset(0.66f, 0.28f),
@@ -732,6 +865,7 @@ fun ProviderMarketplaceCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier
             .fillMaxWidth()
+            .animateContentSize(spring(stiffness = Spring.StiffnessMediumLow))
             .clickable { onClick() }
             .testTag("provider_card_${provider.id}")
     ) {
@@ -787,7 +921,7 @@ fun ProviderMarketplaceCard(
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "📍 ${provider.address} (${provider.distanceKm} km) • ★ ${provider.rating} (${provider.reviewCount})",
+                text = "📍 ${provider.distanceKm} km away (${provider.address}) • ★ ${provider.rating} (${provider.reviewCount})",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -810,7 +944,7 @@ fun ProviderMarketplaceCard(
                         color = GroomlySuccessMint
                     )
                     Text(
-                        text = if (provider.homeServiceAvailable) "Home Service & Walk-In Enabled" else "In-Studio & Walk-In Queue",
+                        text = "Self-Created Haircut Packaging Available",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -826,7 +960,7 @@ fun ProviderMarketplaceCard(
                         onClick = onClick,
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Book Slot")
+                        Text("Custom Book")
                     }
                 }
             }
@@ -841,7 +975,8 @@ private fun CustomerBookingsTab(
     viewModel: GroomlyViewModel,
     onOpenQueueQr: (QueueTicket) -> Unit
 ) {
-    var filterTab by remember { mutableIntStateOf(0) } // 0 = Upcoming, 1 = Completed, 2 = Cancelled/Queue
+    val context = LocalContext.current
+    var filterTab by remember { mutableIntStateOf(0) }
     var reviewTargetAppt by remember { mutableStateOf<Appointment?>(null) }
 
     reviewTargetAppt?.let { appt ->
@@ -868,7 +1003,7 @@ private fun CustomerBookingsTab(
     ) {
         item {
             Text(
-                text = "My Appointments & Live Queue",
+                text = "My Bookings, Custom Packages & Live Queue",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -947,7 +1082,7 @@ private fun CustomerBookingsTab(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "No appointments in this tab yet. Explore nearby salons to book in 30 seconds!",
+                        text = "No appointments in this tab yet. Build a self-created package from the HTML5 or Native Home screen!",
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(18.dp)
                     )
@@ -990,12 +1125,12 @@ private fun CustomerBookingsTab(
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
-                            text = "Professional: ${appt.staffName} • Payment: ${appt.paymentMethod} (${appt.paymentType})",
+                            text = "Professional: ${appt.staffName} • Gateway: ${appt.paymentMethod} (${appt.paymentType})",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Total: ₹${appt.totalAmountInr} | Advance Paid: ₹${appt.advancePaidInr} | Balance: ₹${appt.remainingBalanceInr}",
+                            text = "Total: ₹${appt.totalAmountInr} | Pre-Charged: ₹${appt.advancePaidInr} | Balance: ₹${appt.remainingBalanceInr}",
                             style = MaterialTheme.typography.labelLarge,
                             color = GroomlySuccessMint
                         )
@@ -1004,6 +1139,20 @@ private fun CustomerBookingsTab(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.padding(top = 6.dp)
                         ) {
+                            OutlinedButton(
+                                onClick = {
+                                    viewModel.dispatchWhatsAppAndOpenChat(
+                                        context = context,
+                                        phone = "+919845011223",
+                                        message = "Groomly Booking Confirmation at ${appt.providerName} on ${appt.dateIso} at ${appt.timeSlot}: ${appt.serviceSummary}. Pre-Charged ₹${appt.advancePaidInr}, Balance ₹${appt.remainingBalanceInr}."
+                                    )
+                                }
+                            ) {
+                                Icon(Icons.Default.Share, contentDescription = "WhatsApp", modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("WhatsApp")
+                            }
+
                             if (appt.status in listOf("CONFIRMED", "RESCHEDULED")) {
                                 OutlinedButton(
                                     onClick = {
@@ -1011,13 +1160,6 @@ private fun CustomerBookingsTab(
                                     }
                                 ) {
                                     Text("Reschedule")
-                                }
-                                OutlinedButton(
-                                    onClick = {
-                                        viewModel.updateAppointmentLifecycle(appt, "COMPLETED")
-                                    }
-                                ) {
-                                    Text("Mark Completed")
                                 }
                                 TextButton(
                                     onClick = {
@@ -1030,7 +1172,7 @@ private fun CustomerBookingsTab(
                                 Button(onClick = { reviewTargetAppt = appt }) {
                                     Icon(Icons.Default.RateReview, contentDescription = "Review", modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Rate & Review Staff")
+                                    Text("Rate Staff")
                                 }
                             }
                         }
@@ -1049,7 +1191,7 @@ private fun WriteVerifiedReviewDialog(
 ) {
     var rating by remember { mutableIntStateOf(5) }
     var staffRating by remember { mutableIntStateOf(5) }
-    var comment by remember { mutableStateOf("Loved the hygiene, punctuality, and styling precision!") }
+    var comment by remember { mutableStateOf("Loved the custom package options, hygiene, and styling precision!") }
     var photoTag by remember { mutableStateOf("After-Service Glow & Finish") }
 
     AlertDialog(
@@ -1143,6 +1285,7 @@ private fun CustomerProfileAndWalletTab(
     viewModel: GroomlyViewModel,
     onSignOut: () -> Unit
 ) {
+    val context = LocalContext.current
     val whatsappLogs by viewModel.whatsappLogs.collectAsState()
     var newAddressText by remember { mutableStateOf("") }
 
@@ -1188,7 +1331,15 @@ private fun CustomerProfileAndWalletTab(
                             )
                         }
                         Button(
-                            onClick = { viewModel.topUpWalletAndPreferences(addWalletInr = 500L) },
+                            onClick = {
+                                PaymentAndWhatsAppService.launchUpiPaymentIntent(
+                                    context = context,
+                                    amountInr = 500,
+                                    merchantName = "Groomly Wallet",
+                                    transactionNote = "Wallet Top-Up"
+                                )
+                                viewModel.topUpWalletAndPreferences(addWalletInr = 500L)
+                            },
                             modifier = Modifier.testTag("top_up_wallet_button")
                         ) {
                             Text("+ ₹500 UPI Top-Up")
@@ -1206,7 +1357,7 @@ private fun CustomerProfileAndWalletTab(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Saved Home-Service Addresses", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("Saved Home-Service GPS Addresses", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     profile.savedAddresses.forEach { addr ->
                         Text("• $addr", style = MaterialTheme.typography.bodyMedium)
                     }
@@ -1247,20 +1398,34 @@ private fun CustomerProfileAndWalletTab(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("WhatsApp Business API Alerts", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text("Receive instant booking confirmations, reminders & live queue turn alerts", style = MaterialTheme.typography.bodySmall)
+                            Text("Official WhatsApp Business Integration", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text("Receive instant booking confirmations, custom package receipts & live queue alerts", style = MaterialTheme.typography.bodySmall)
                         }
                         Switch(
                             checked = profile.whatsappAlertsEnabled,
                             onCheckedChange = { viewModel.topUpWalletAndPreferences(whatsappEnabled = it) }
                         )
                     }
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.dispatchWhatsAppAndOpenChat(
+                                context = context,
+                                phone = "+919845011223",
+                                message = "Hi Groomly Concierge! Please send my upcoming appointment & live queue status."
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "WhatsApp", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Open Live WhatsApp Concierge Chat")
+                    }
                     Text(
                         text = "Recent WhatsApp Dispatches:",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    whatsappLogs.take(3).forEach { log ->
+                    whatsappLogs.take(4).forEach { log ->
                         Text(text = "• $log", style = MaterialTheme.typography.bodySmall)
                     }
                 }
