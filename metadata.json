@@ -1,0 +1,6 @@
+{
+  "name": "Groomly",
+  "description": "Multi-vendor beauty, grooming, salon appointment booking, live queue, provider studio, and admin marketplace ecosystem.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

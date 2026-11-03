@@ -1,0 +1,309 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 1: Global Default-Deny Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    function isValidTimestamp(ts) { return ts is timestamp && ts <= request.time; }
+
+    function isValidStringList(arr, maxLen) {
+      return arr is list && arr.size() <= maxLen &&
+             (arr.size() == 0 || (arr[0] is string && arr[0].size() >= 1 && arr[0].size() <= 160));
+    }
+
+    // 1. UserProfile Validation Blueprint
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             data.genderPreference is string && data.genderPreference in ['MENS', 'WOMENS', 'UNISEX'] &&
+             data.cityLocation is string && data.cityLocation.size() >= 1 && data.cityLocation.size() <= 120 &&
+             isValidStringList(data.savedAddresses, 10) &&
+             isValidStringList(data.favouriteProviderIds, 10) &&
+             data.walletBalanceInr is int && data.walletBalanceInr >= 0 && data.walletBalanceInr <= 1000000 &&
+             data.loyaltyPoints is int && data.loyaltyPoints >= 0 && data.loyaltyPoints <= 1000000 &&
+             data.whatsappAlertsEnabled is bool &&
+             data.pushNotificationsEnabled is bool &&
+             data.marketingConsent is bool &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+      allow list: if isSignedIn() && request.auth.uid == userId && existing().userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().keys().hasAll([
+                         'userId', 'displayName', 'genderPreference', 'cityLocation',
+                         'savedAddresses', 'favouriteProviderIds', 'walletBalanceInr',
+                         'loyaltyPoints', 'whatsappAlertsEnabled', 'pushNotificationsEnabled',
+                         'marketingConsent', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'displayName', 'genderPreference', 'cityLocation',
+                         'savedAddresses', 'favouriteProviderIds', 'walletBalanceInr',
+                         'loyaltyPoints', 'whatsappAlertsEnabled', 'pushNotificationsEnabled',
+                         'marketingConsent', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidTimestamp(incoming().createdAt) &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       isValidUserProfile(incoming()) &&
+                       request.auth.uid == userId &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'displayName', 'genderPreference', 'cityLocation',
+                         'savedAddresses', 'favouriteProviderIds', 'walletBalanceInr',
+                         'loyaltyPoints', 'whatsappAlertsEnabled', 'pushNotificationsEnabled',
+                         'marketingConsent', 'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+    }
+
+    // 2. Appointment Validation Blueprint
+    function isValidAppointment(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.providerId is string && data.providerId.size() >= 1 && data.providerId.size() <= 80 &&
+             data.providerName is string && data.providerName.size() >= 1 && data.providerName.size() <= 100 &&
+             data.vertical is string && data.vertical in ['SALON', 'BRIDAL', 'DIETITIAN', 'DERMATOLOGY'] &&
+             data.serviceSummary is string && data.serviceSummary.size() >= 1 && data.serviceSummary.size() <= 240 &&
+             data.staffId is string && data.staffId.size() >= 1 && data.staffId.size() <= 80 &&
+             data.staffName is string && data.staffName.size() >= 1 && data.staffName.size() <= 80 &&
+             data.dateIso is string && data.dateIso.size() >= 8 && data.dateIso.size() <= 20 &&
+             data.timeSlot is string && data.timeSlot.size() >= 3 && data.timeSlot.size() <= 30 &&
+             data.durationMinutes is int && data.durationMinutes >= 10 && data.durationMinutes <= 600 &&
+             data.totalAmountInr is int && data.totalAmountInr >= 0 && data.totalAmountInr <= 500000 &&
+             data.advancePaidInr is int && data.advancePaidInr >= 0 && data.advancePaidInr <= data.totalAmountInr &&
+             data.remainingBalanceInr is int && data.remainingBalanceInr >= 0 && data.remainingBalanceInr <= data.totalAmountInr &&
+             data.paymentMethod is string && data.paymentMethod in ['UPI', 'CARD', 'NET_BANKING', 'WALLET', 'CASH_AT_SHOP'] &&
+             data.paymentType is string && data.paymentType in ['ADVANCE', 'FULL', 'PAY_AT_VENUE'] &&
+             data.couponCode is string && data.couponCode.size() >= 1 && data.couponCode.size() <= 40 &&
+             data.isHomeService is bool &&
+             data.status is string && data.status in ['CONFIRMED', 'RESCHEDULED', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'REFUNDED'] &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    match /appointments/{appointmentId} {
+      allow get: if isSignedIn() && isValidId(appointmentId) && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       isValidId(appointmentId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'providerId', 'providerName', 'vertical', 'serviceSummary',
+                         'staffId', 'staffName', 'dateIso', 'timeSlot', 'durationMinutes',
+                         'totalAmountInr', 'advancePaidInr', 'remainingBalanceInr',
+                         'paymentMethod', 'paymentType', 'couponCode', 'isHomeService',
+                         'status', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'providerId', 'providerName', 'vertical', 'serviceSummary',
+                         'staffId', 'staffName', 'dateIso', 'timeSlot', 'durationMinutes',
+                         'totalAmountInr', 'advancePaidInr', 'remainingBalanceInr',
+                         'paymentMethod', 'paymentType', 'couponCode', 'isHomeService',
+                         'status', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidTimestamp(incoming().createdAt) &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       isValidAppointment(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(appointmentId) &&
+                       isValidAppointment(incoming()) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().providerId == existing().providerId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       !(existing().status in ['CANCELLED', 'REFUNDED']) &&
+                       (
+                         // Action 1: Reschedule or Staff Reassignment
+                         incoming().diff(existing()).affectedKeys().hasOnly(['dateIso', 'timeSlot', 'staffId', 'staffName', 'status', 'updatedAt']) ||
+                         // Action 2: Lifecycle Status & Payment Settlement Update
+                         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'advancePaidInr', 'remainingBalanceInr', 'updatedAt'])
+                       );
+
+      allow delete: if isSignedIn() && isValidId(appointmentId) && existing().userId == request.auth.uid;
+    }
+
+    // 3. QueueTicket Validation Blueprint
+    function isValidQueueTicket(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.providerId is string && data.providerId.size() >= 1 && data.providerId.size() <= 80 &&
+             data.providerName is string && data.providerName.size() >= 1 && data.providerName.size() <= 100 &&
+             data.serviceName is string && data.serviceName.size() >= 1 && data.serviceName.size() <= 120 &&
+             data.staffName is string && data.staffName.size() >= 1 && data.staffName.size() <= 80 &&
+             data.queueNumber is int && data.queueNumber >= 1 && data.queueNumber <= 999 &&
+             data.currentlyServingNumber is int && data.currentlyServingNumber >= 1 && data.currentlyServingNumber <= 999 &&
+             data.estimatedWaitMinutes is int && data.estimatedWaitMinutes >= 0 && data.estimatedWaitMinutes <= 300 &&
+             data.qrCheckInCode is string && data.qrCheckInCode.size() >= 4 && data.qrCheckInCode.size() <= 80 &&
+             data.status is string && data.status in ['WAITING', 'APPROACHING', 'CHECKED_IN', 'SERVING', 'COMPLETED', 'CANCELLED'] &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    match /queue_tickets/{ticketId} {
+      allow get: if isSignedIn() && isValidId(ticketId) && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       isValidId(ticketId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'providerId', 'providerName', 'serviceName', 'staffName',
+                         'queueNumber', 'currentlyServingNumber', 'estimatedWaitMinutes',
+                         'qrCheckInCode', 'status', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'providerId', 'providerName', 'serviceName', 'staffName',
+                         'queueNumber', 'currentlyServingNumber', 'estimatedWaitMinutes',
+                         'qrCheckInCode', 'status', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidTimestamp(incoming().createdAt) &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       isValidQueueTicket(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(ticketId) &&
+                       isValidQueueTicket(incoming()) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().providerId == existing().providerId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       !(existing().status in ['COMPLETED', 'CANCELLED']) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'currentlyServingNumber', 'estimatedWaitMinutes', 'status', 'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() && isValidId(ticketId) && existing().userId == request.auth.uid;
+    }
+
+    // 4. ProviderBusiness Validation Blueprint
+    function isValidProviderBusiness(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.ownerName is string && data.ownerName.size() >= 1 && data.ownerName.size() <= 80 &&
+             data.businessName is string && data.businessName.size() >= 1 && data.businessName.size() <= 100 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 80 &&
+             data.vertical is string && data.vertical in ['SALON', 'BRIDAL', 'DIETITIAN', 'DERMATOLOGY'] &&
+             data.genderFocus is string && data.genderFocus in ['MENS', 'WOMENS', 'UNISEX'] &&
+             data.cityArea is string && data.cityArea.size() >= 1 && data.cityArea.size() <= 120 &&
+             data.openingHours is string && data.openingHours.size() >= 1 && data.openingHours.size() <= 80 &&
+             data.homeServiceEnabled is bool &&
+             data.autoAcceptBookings is bool &&
+             data.verificationStatus is string && data.verificationStatus in ['PENDING_REVIEW', 'VERIFIED', 'SUSPENDED'] &&
+             data.commissionRatePercent is int && data.commissionRatePercent >= 5 && data.commissionRatePercent <= 40 &&
+             data.subscriptionTier is string && data.subscriptionTier in ['STARTER', 'GROWTH', 'ENTERPRISE'] &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    match /provider_businesses/{businessId} {
+      allow get: if isSignedIn() && isValidId(businessId) && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       isValidId(businessId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'ownerName', 'businessName', 'category', 'vertical',
+                         'genderFocus', 'cityArea', 'openingHours', 'homeServiceEnabled',
+                         'autoAcceptBookings', 'verificationStatus', 'commissionRatePercent',
+                         'subscriptionTier', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'ownerName', 'businessName', 'category', 'vertical',
+                         'genderFocus', 'cityArea', 'openingHours', 'homeServiceEnabled',
+                         'autoAcceptBookings', 'verificationStatus', 'commissionRatePercent',
+                         'subscriptionTier', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidTimestamp(incoming().createdAt) &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       isValidProviderBusiness(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(businessId) &&
+                       isValidProviderBusiness(incoming()) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'ownerName', 'businessName', 'category', 'genderFocus',
+                         'cityArea', 'openingHours', 'homeServiceEnabled',
+                         'autoAcceptBookings', 'verificationStatus', 'commissionRatePercent',
+                         'subscriptionTier', 'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() && isValidId(businessId) && existing().userId == request.auth.uid;
+    }
+
+    // 5. Review Validation Blueprint
+    function isValidReview(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.appointmentId is string && data.appointmentId.size() >= 1 && data.appointmentId.size() <= 80 &&
+             data.providerId is string && data.providerId.size() >= 1 && data.providerId.size() <= 80 &&
+             data.providerName is string && data.providerName.size() >= 1 && data.providerName.size() <= 100 &&
+             data.staffName is string && data.staffName.size() >= 1 && data.staffName.size() <= 80 &&
+             data.rating is int && data.rating >= 1 && data.rating <= 5 &&
+             data.staffRating is int && data.staffRating >= 1 && data.staffRating <= 5 &&
+             data.comment is string && data.comment.size() >= 1 && data.comment.size() <= 500 &&
+             data.photoTag is string && data.photoTag.size() <= 120 &&
+             data.isReported is bool &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    match /reviews/{reviewId} {
+      allow get: if isSignedIn() && isValidId(reviewId) && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       isValidId(reviewId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'appointmentId', 'providerId', 'providerName',
+                         'staffName', 'rating', 'staffRating', 'comment',
+                         'photoTag', 'isReported', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'appointmentId', 'providerId', 'providerName',
+                         'staffName', 'rating', 'staffRating', 'comment',
+                         'photoTag', 'isReported', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidTimestamp(incoming().createdAt) &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       isValidReview(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(reviewId) &&
+                       isValidReview(incoming()) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().appointmentId == existing().appointmentId &&
+                       incoming().providerId == existing().providerId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'rating', 'staffRating', 'comment', 'photoTag', 'isReported', 'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() && isValidId(reviewId) && existing().userId == request.auth.uid;
+    }
+  }
+}

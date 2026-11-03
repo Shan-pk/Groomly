@@ -1,0 +1,451 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated Groomly user profile storing preferences, wallet balance, loyalty points, and saved addresses.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User full name (1..80 chars)."
+        },
+        "genderPreference": {
+          "type": "string",
+          "enum": ["MENS", "WOMENS", "UNISEX"],
+          "description": "Preferred grooming/salon filter."
+        },
+        "cityLocation": {
+          "type": "string",
+          "description": "Selected city and neighborhood (1..120 chars)."
+        },
+        "savedAddresses": {
+          "type": "array",
+          "description": "Up to 10 saved customer addresses for home service."
+        },
+        "favouriteProviderIds": {
+          "type": "array",
+          "description": "Up to 10 favourite provider IDs."
+        },
+        "walletBalanceInr": {
+          "type": "integer",
+          "description": "Groomly wallet balance in INR (0..1000000)."
+        },
+        "loyaltyPoints": {
+          "type": "integer",
+          "description": "Reward loyalty points earned from completed bookings."
+        },
+        "whatsappAlertsEnabled": {
+          "type": "boolean",
+          "description": "Opt-in for WhatsApp Business booking and queue updates."
+        },
+        "pushNotificationsEnabled": {
+          "type": "boolean",
+          "description": "Opt-in for push notifications."
+        },
+        "marketingConsent": {
+          "type": "boolean",
+          "description": "Opt-in for promotional offers."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on creation (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on update (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "genderPreference",
+        "cityLocation",
+        "savedAddresses",
+        "favouriteProviderIds",
+        "walletBalanceInr",
+        "loyaltyPoints",
+        "whatsappAlertsEnabled",
+        "pushNotificationsEnabled",
+        "marketingConsent",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Smart multi-service appointment booking with conflict validation, staff assignment, and split advance payment breakdown.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated user UID who owns this booking."
+        },
+        "providerId": {
+          "type": "string",
+          "description": "Target salon/barber/clinic provider ID."
+        },
+        "providerName": {
+          "type": "string",
+          "description": "Display name of the salon, studio, or clinic."
+        },
+        "vertical": {
+          "type": "string",
+          "enum": ["SALON", "BRIDAL", "DIETITIAN", "DERMATOLOGY"],
+          "description": "Service vertical category."
+        },
+        "serviceSummary": {
+          "type": "string",
+          "description": "Combined summary of booked services or package."
+        },
+        "staffId": {
+          "type": "string",
+          "description": "Selected professional ID or any_available."
+        },
+        "staffName": {
+          "type": "string",
+          "description": "Selected professional display name."
+        },
+        "dateIso": {
+          "type": "string",
+          "description": "Appointment date in YYYY-MM-DD format."
+        },
+        "timeSlot": {
+          "type": "string",
+          "description": "Booked slot time label, e.g., 11:30 AM."
+        },
+        "durationMinutes": {
+          "type": "integer",
+          "description": "Total calculated duration in minutes including buffer."
+        },
+        "totalAmountInr": {
+          "type": "integer",
+          "description": "Net booking amount in INR after coupon discounts."
+        },
+        "advancePaidInr": {
+          "type": "integer",
+          "description": "Advance amount paid online in INR."
+        },
+        "remainingBalanceInr": {
+          "type": "integer",
+          "description": "Remaining balance payable at venue or settled."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["UPI", "CARD", "NET_BANKING", "WALLET", "CASH_AT_SHOP"],
+          "description": "Selected India-first payment method."
+        },
+        "paymentType": {
+          "type": "string",
+          "enum": ["ADVANCE", "FULL", "PAY_AT_VENUE"],
+          "description": "Payment split option."
+        },
+        "couponCode": {
+          "type": "string",
+          "description": "Applied promotional coupon code or NONE."
+        },
+        "isHomeService": {
+          "type": "boolean",
+          "description": "Whether the appointment is booked as a home service."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["CONFIRMED", "RESCHEDULED", "ARRIVED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "REFUNDED"],
+          "description": "Current lifecycle status of the appointment."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on creation (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on update (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "providerId",
+        "providerName",
+        "vertical",
+        "serviceSummary",
+        "staffId",
+        "staffName",
+        "dateIso",
+        "timeSlot",
+        "durationMinutes",
+        "totalAmountInr",
+        "advancePaidInr",
+        "remainingBalanceInr",
+        "paymentMethod",
+        "paymentType",
+        "couponCode",
+        "isHomeService",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "QueueTicket": {
+      "title": "QueueTicket",
+      "description": "Real-time live queue digital ticket with QR check-in and non-guaranteed estimated wait time.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated user UID."
+        },
+        "providerId": {
+          "type": "string",
+          "description": "Target salon/barber provider ID."
+        },
+        "providerName": {
+          "type": "string",
+          "description": "Target salon/barber name."
+        },
+        "serviceName": {
+          "type": "string",
+          "description": "Requested walk-in/queue service."
+        },
+        "staffName": {
+          "type": "string",
+          "description": "Preferred barber/stylist name."
+        },
+        "queueNumber": {
+          "type": "integer",
+          "description": "Assigned queue token number (1..999)."
+        },
+        "currentlyServingNumber": {
+          "type": "integer",
+          "description": "Token number currently being served at the shop."
+        },
+        "estimatedWaitMinutes": {
+          "type": "integer",
+          "description": "Non-guaranteed estimated wait duration in minutes."
+        },
+        "qrCheckInCode": {
+          "type": "string",
+          "description": "Digital QR verification code for shop check-in."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["WAITING", "APPROACHING", "CHECKED_IN", "SERVING", "COMPLETED", "CANCELLED"],
+          "description": "Live queue state."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on creation (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on update (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "providerId",
+        "providerName",
+        "serviceName",
+        "staffName",
+        "queueNumber",
+        "currentlyServingNumber",
+        "estimatedWaitMinutes",
+        "qrCheckInCode",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ProviderBusiness": {
+      "title": "ProviderBusiness",
+      "description": "Registered multi-vendor business account for salon owners, barbers, bridal artists, dietitians, and dermatologists.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner user UID."
+        },
+        "ownerName": {
+          "type": "string",
+          "description": "Business owner or doctor full name."
+        },
+        "businessName": {
+          "type": "string",
+          "description": "Public brand name of the business."
+        },
+        "category": {
+          "type": "string",
+          "description": "Primary service category."
+        },
+        "vertical": {
+          "type": "string",
+          "enum": ["SALON", "BRIDAL", "DIETITIAN", "DERMATOLOGY"],
+          "description": "Marketplace vertical."
+        },
+        "genderFocus": {
+          "type": "string",
+          "enum": ["MENS", "WOMENS", "UNISEX"],
+          "description": "Target clientele gender eligibility."
+        },
+        "cityArea": {
+          "type": "string",
+          "description": "Neighborhood and city address."
+        },
+        "openingHours": {
+          "type": "string",
+          "description": "Operating schedule display string."
+        },
+        "homeServiceEnabled": {
+          "type": "boolean",
+          "description": "Whether home visits are supported."
+        },
+        "autoAcceptBookings": {
+          "type": "boolean",
+          "description": "Whether eligible bookings are auto-accepted."
+        },
+        "verificationStatus": {
+          "type": "string",
+          "enum": ["PENDING_REVIEW", "VERIFIED", "SUSPENDED"],
+          "description": "Admin verification and compliance status."
+        },
+        "commissionRatePercent": {
+          "type": "integer",
+          "description": "Configurable platform commission percentage (5..40)."
+        },
+        "subscriptionTier": {
+          "type": "string",
+          "enum": ["STARTER", "GROWTH", "ENTERPRISE"],
+          "description": "Provider SaaS subscription plan."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on creation (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on update (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "ownerName",
+        "businessName",
+        "category",
+        "vertical",
+        "genderFocus",
+        "cityArea",
+        "openingHours",
+        "homeServiceEnabled",
+        "autoAcceptBookings",
+        "verificationStatus",
+        "commissionRatePercent",
+        "subscriptionTier",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Verified post-appointment customer review and individual staff rating.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated reviewer UID."
+        },
+        "appointmentId": {
+          "type": "string",
+          "description": "Completed appointment ID being reviewed."
+        },
+        "providerId": {
+          "type": "string",
+          "description": "Reviewed business provider ID."
+        },
+        "providerName": {
+          "type": "string",
+          "description": "Reviewed business name."
+        },
+        "staffName": {
+          "type": "string",
+          "description": "Reviewed staff member name."
+        },
+        "rating": {
+          "type": "integer",
+          "description": "Overall star rating (1..5)."
+        },
+        "staffRating": {
+          "type": "integer",
+          "description": "Staff-specific star rating (1..5)."
+        },
+        "comment": {
+          "type": "string",
+          "description": "Customer review text (1..500 chars)."
+        },
+        "photoTag": {
+          "type": "string",
+          "description": "Optional service photo tag caption (0..120 chars)."
+        },
+        "isReported": {
+          "type": "boolean",
+          "description": "Moderation flag for inappropriate review reporting."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on creation (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp on update (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "appointmentId",
+        "providerId",
+        "providerName",
+        "staffName",
+        "rating",
+        "staffRating",
+        "comment",
+        "photoTag",
+        "isReported",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Per-user profile, preferences, saved addresses, favourites, wallet balance, and loyalty points."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": { "$ref": "#/entities/Appointment" },
+      "description": "User-scoped smart appointments across salons, bridal studios, dietitians, and dermatology clinics."
+    },
+    "/queue_tickets/{ticketId}": {
+      "schema": { "$ref": "#/entities/QueueTicket" },
+      "description": "Real-time live queue tickets with QR check-in and turn progression."
+    },
+    "/provider_businesses/{businessId}": {
+      "schema": { "$ref": "#/entities/ProviderBusiness" },
+      "description": "Provider business accounts, verification state, and commission settings."
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/Review" },
+      "description": "Verified appointment reviews and staff ratings."
+    }
+  }
+}
